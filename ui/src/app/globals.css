@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .test-result {
+    @apply bg-white rounded-lg shadow-lg p-6 mt-4;
+  }
+
+  .summary {
+    @apply mb-6 p-4 bg-gray-50 rounded-lg;
+  }
+
+  .summary h3 {
+    @apply text-lg font-semibold mb-3 text-gray-800;
+  }
+
+  .stats {
+    @apply grid grid-cols-1 md:grid-cols-3 gap-4;
+  }
+
+  .stats > div {
+    @apply p-3 bg-white rounded shadow-sm;
+  }
+
+  .scenario {
+    @apply border rounded-lg mb-2 overflow-hidden;
+  }
+
+  .scenario.passed {
+    @apply border-green-200 bg-green-50;
+  }
+
+  .scenario.failed {
+    @apply border-red-200 bg-red-50;
+  }
+
+  .scenario-header {
+    @apply flex items-center p-3 cursor-pointer hover:bg-opacity-75;
+  }
+
+  .scenario.passed .scenario-header {
+    @apply bg-green-100;
+  }
+
+  .scenario.failed .scenario-header {
+    @apply bg-red-100;
+  }
+
+  .status-icon {
+    @apply mr-2 font-bold;
+  }
+
+  .scenario.passed .status-icon {
+    @apply text-green-600;
+  }
+
+  .scenario.failed .status-icon {
+    @apply text-red-600;
+  }
+
+  .scenario-name {
+    @apply flex-grow font-medium;
+  }
+
+  .toggle-icon {
+    @apply text-gray-500;
+  }
+
+  .scenario-steps {
+    @apply p-3;
+  }
+
+  .step {
+    @apply pl-6 py-2 border-l-2 relative;
+  }
+
+  .step.passed {
+    @apply border-green-400;
+  }
+
+  .step.failed {
+    @apply border-red-400;
+  }
+
+  .step-content {
+    @apply mb-1;
+  }
+
+  .step-logs {
+    @apply mt-2 text-sm bg-white rounded p-2 font-mono whitespace-pre-wrap;
+  }
+
+  .request, .response {
+    @apply mb-4 p-4 bg-white rounded shadow-sm;
+  }
+
+  .request h4, .response h4 {
+    @apply text-sm font-semibold mb-2 text-gray-700;
+  }
+
+  .headers {
+    @apply mt-2 text-sm;
+  }
+
+  .headers h5 {
+    @apply font-medium mb-1 text-gray-600;
+  }
+
+  .headers > div {
+    @apply text-gray-600 mb-1;
+  }
+
+  .body {
+    @apply mt-2;
+  }
+
+  .body h5 {
+    @apply text-sm font-medium mb-1 text-gray-600;
+  }
+
+  .body pre {
+    @apply bg-gray-50 p-2 rounded text-sm overflow-x-auto;
+  }
+
+  .logs {
+    @apply mt-4 bg-gray-50 p-3 rounded;
+  }
+
+  .logs h4 {
+    @apply text-sm font-semibold mb-2 text-gray-700;
+  }
+
+  .error {
+    @apply mt-4 bg-red-50 p-3 rounded border border-red-200;
+  }
+
+  .error h4 {
+    @apply text-sm font-semibold mb-2 text-red-700;
+  }
+
+  .error pre {
+    @apply text-sm text-red-600 font-mono;
+  }
+
+  .step-view {
+    @apply mb-2 rounded border;
+    border-width: 1px;
+  }
+
+  .step-view.passed {
+    @apply border-green-200 bg-green-50;
+  }
+
+  .step-view.failed {
+    @apply border-red-200 bg-red-50;
+  }
+
+  .step-view.skipped {
+    @apply border-gray-200 bg-gray-50;
+  }
+
+  .step-header {
+    @apply p-2 hover:bg-opacity-50;
+  }
+
+  .step-logs {
+    @apply border-t p-2;
+  }
+
+  .step-view.passed .step-logs {
+    @apply border-green-200;
+  }
+
+  .step-view.failed .step-logs {
+    @apply border-red-200;
+  }
+
+  .step-view.skipped .step-logs {
+    @apply border-gray-200;
+  }
+
+  /* Failed step highlighting in Monaco Editor */
+  .failedStepHighlight {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+  }
+
+  .failedStepGlyph {
+    background-color: #ef4444;
+    border-radius: 50%;
+    width: 8px !important;
+    height: 8px !important;
+    margin-left: 5px;
+    margin-top: 10px;
+  }
+
+  .failedStepDecoration {
+    width: 3px !important;
+    background-color: #ef4444;
+    margin-left: 3px;
+  }
+}

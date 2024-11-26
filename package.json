@@ -1,0 +1,28 @@
+{
+  "name": "kaas",
+  "version": "1.0.0",
+  "description": "Karate as a Service - Execute Karate features through a ui interface",
+  "private": true,
+  "workspaces": [
+    "api",
+    "ui"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:ui\"",
+    "dev:api": "npm run start:dev --workspace=api",
+    "dev:ui": "npm run dev --workspace=ui",
+    "build": "npm run build --workspaces",
+    "start": "npm run start:prod --workspace=api"
+  },
+  "keywords": [
+    "karate",
+    "testing",
+    "api",
+    "service"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
