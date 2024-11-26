@@ -185,13 +185,16 @@ export class KarateService {
         const additionalJvmArgs = [
           // Thread monitoring
           monitoringAgent ? `-javaagent:${monitoringAgent}` : '',
-          
-          // Karate-specific optimizations
-          '-Dkarate.env.parallel=true',
+        
+          // Karate-specific optimizations only (removing duplicated JVM options)
+          '-Dkarate.env.parallel=false',
           '-Dkarate.timeoutInterval=5000',
           '-Dkarate.http.ssl.allowInsecure=true',
-          '-Dkarate.http.connectTimeout=10000',
-          '-Dkarate.http.readTimeout=10000',
+          '-Dkarate.http.connectTimeout=5000',
+          '-Dkarate.http.readTimeout=5000',
+          // Resource-specific settings for render.com
+          '-XX:InitialRAMPercentage=50.0',
+          '-XX:MaxRAMPercentage=80.0',
           `-Dkarate.config.dir=${configPath ? path.dirname(configPath) : ''}`,
           `-Dkarate.output.dir=${tempDir}`
         ].filter(Boolean);
@@ -213,12 +216,11 @@ export class KarateService {
 
         try {
           const { stdout, stderr } = await execAsync(command, {
-            maxBuffer: 50 * 1024 * 1024,
-            timeout: 120000,
+            maxBuffer: 10 * 1024 * 1024,
+            timeout: 60000,
             env: {
               ...process.env,
-              JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS,
-              JAVA_THREADS: 'virtual'
+              JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS
             }
           });
 
