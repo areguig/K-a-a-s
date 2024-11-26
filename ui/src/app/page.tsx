@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import type { editor } from 'monaco-editor';
+import { type Monaco, type EditorProps } from '@monaco-editor/react';
 import { KarateVersions, KarateResult } from '../types/karate';
 import { ScenarioView } from '../components/ScenarioView';
 import { ResultsSummary } from '../components/ResultsSummary';
@@ -57,7 +57,7 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [versions, setVersions] = useState<KarateVersions>({ karate: '', java: '' });
-  const [editorRef, setEditorRef] = useState<editor.IStandaloneCodeEditor | null>(null);
+  const [editorRef, setEditorRef] = useState<Parameters<NonNullable<EditorProps['onMount']>>[0] | null>(null);
   const [expandedScenarios, setExpandedScenarios] = useState<{ [key: string]: boolean }>({});
   const [expandedErrors, setExpandedErrors] = useState<{ [key: string]: boolean }>({});
 
