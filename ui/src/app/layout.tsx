@@ -3,7 +3,11 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import KarateScripts from './components/KarateScripts'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['400', '500', '600', '700']
+})
 
 export const metadata: Metadata = {
   title: 'Karate as a Service',
@@ -17,9 +21,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
       <body className={inter.className}>
         <KarateScripts />
         {children}

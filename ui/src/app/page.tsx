@@ -100,7 +100,7 @@ export default function Home() {
     const model = editor.getModel();
     if (!model) return;
 
-    const decorations = [];
+    const decorations: editor.IModelDeltaDecoration[] = [];
     const lines = model.getLinesContent();
 
     const findStepLine = (stepText: string): number => {
