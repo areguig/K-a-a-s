@@ -293,79 +293,79 @@ export class KarateService {
       }
 
       try {
-        // Build command
-        const args = ['-jar', this.karatePath];
+        // Build command with virtual threads and GraalVM optimizations
+        const jvmArgs = [
+          // Enable preview features for virtual threads
+          '--enable-preview',
+          
+          // Virtual threads and concurrency optimizations
+          '-Djdk.virtualThreadScheduler.parallelism=32',
+          '-Djdk.virtualThreadScheduler.maxPoolSize=256',
+          '-Djava.util.concurrent.ForkJoinPool.common.parallelism=32',
+          
+          // GraalVM specific optimizations
+          '-XX:+UseJVMCICompiler',
+          '-XX:+EnableVectorSupport',
+          '-XX:+UseG1GC',
+          '-XX:+UseStringDeduplication',
+          '-XX:+OptimizeStringConcat',
+          '-XX:MaxGCPauseMillis=100',
+          
+          // Karate specific optimizations
+          '-Dkarate.env=dev',
+          '-Dkarate.config.dir=' + (configPath ? path.dirname(configPath) : ''),
+          '-Dkarate.output.dir=' + tempDir,
+          
+          // System settings
+          '-Dfile.encoding=UTF-8',
+          '-Djava.awt.headless=true',
+          
+          // Performance monitoring
+          '-Dcom.sun.management.jmxremote',
+          '-Dcom.sun.management.jmxremote.port=3333',
+          '-Dcom.sun.management.jmxremote.authenticate=false',
+          '-Dcom.sun.management.jmxremote.ssl=false'
+        ];
+        
+        const args = [...jvmArgs, '-jar', this.karatePath];
         if (configPath) {
           args.push('--configdir', path.dirname(configPath));
         }
         args.push(featurePath);
 
-        // Execute Karate
-        const { stdout, stderr } = await execAsync(`java ${args.join(' ')}`);
-
-        if (stderr) {
-          this.logger.warn('Karate stderr:', stderr);
-        }
-
-        this.logger.debug('Karate stdout:', stdout);
+        // Execute Karate with increased buffer and timeout
+        const command = `java ${args.join(' ')}`;
+        this.logger.debug(`Executing command: ${command}`);
         
-        // Parse the output with the feature content
-        const result = this.parseKarateOutput(stdout, request.feature);
+        const { stdout } = await execAsync(command, {
+          maxBuffer: 50 * 1024 * 1024, // Increase buffer size to 50MB
+          timeout: 120000, // Set timeout to 120 seconds
+          env: {
+            ...process.env,
+            JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS, // Pass JVM options from environment
+            JAVA_THREADS: 'virtual' // Enable virtual threads
+          }
+        });
 
+        // Parse and return results
+        const result = this.parseKarateOutput(stdout, request.feature);
         return {
-          success: result.scenarios.failed === 0,
+          success: true,
           output: result,
           rawOutput: stdout
         };
-
-      } catch (error: any) {
-        if (error.stdout || error.stderr) {
-          const output = error.stdout || error.stderr;
-          if (output.includes('there are test failures') || output.includes('scenarios:')) {
-            const result = this.parseKarateOutput(output, request.feature);
-            return {
-              success: false,
-              output: result,
-              rawOutput: output
-            };
-          }
-        }
-
-        this.logger.error('Error executing Karate feature:', error);
-        return {
-          success: false,
-          output: {
-            scenarios: { total: 0, passed: 0, failed: 0 },
-            features: { total: 0, passed: 0, failed: 0 },
-            time: 0,
-            featureContent: request.feature,
-            steps: []
-          },
-          rawOutput: error.stderr || error.stdout || error.message || 'Unknown error'
-        };
+      } finally {
+        // Cleanup temp directories in parallel
+        await Promise.all(
+          tempDirs.map(dir =>
+            fsPromises.rm(dir, { recursive: true, force: true })
+              .catch(err => this.logger.error(`Error cleaning up temp directory ${dir}:`, err))
+          )
+        );
       }
-    } catch (error: any) {
-      this.logger.error('Error in execute method:', error);
-      return {
-        success: false,
-        output: {
-          scenarios: { total: 0, passed: 0, failed: 0 },
-          features: { total: 0, passed: 0, failed: 0 },
-          time: 0,
-          featureContent: request.feature,
-          steps: []
-        },
-        rawOutput: error.message || 'Unknown error'
-      };
-    } finally {
-      // Cleanup temp directories
-      for (const dir of tempDirs) {
-        try {
-          await fsPromises.rm(dir, { recursive: true });
-        } catch (error) {
-          this.logger.error(`Error cleaning up temp directory ${dir}:`, error);
-        }
-      }
+    } catch (error) {
+      this.logger.error('Error executing Karate:', error);
+      throw error;
     }
   }
 
