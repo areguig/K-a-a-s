@@ -18,8 +18,6 @@ interface KarateVersions {
 
 interface KarateStep {
   name: string;
-  text: string;
-  keyword?: string;
   status: 'passed' | 'failed' | 'skipped';
   errorMessage?: string;
 }
@@ -32,7 +30,7 @@ interface KarateScenario {
 
 interface KarateResult {
   scenario?: KarateScenario;
-  scenarios: KarateScenario[];
+  scenariosList: KarateScenario[];
   steps?: KarateStep[];
   status: 'passed' | 'failed';
   time?: number;
@@ -144,8 +142,8 @@ export default function Home() {
       result.steps.forEach(processStep);
     }
 
-    if (result.scenarios?.length) {
-      result.scenarios.forEach(scenario => {
+    if (result.scenariosList?.length) {
+      result.scenariosList.forEach(scenario => {
         scenario.steps?.forEach(processStep);
       });
     }
@@ -194,41 +192,56 @@ export default function Home() {
         const output = response.data.output;
         // Extract scenarios from feature content
         const scenarioMatches = output.featureContent.match(/Scenario:.*?(?=Scenario:|$)/gs);
-        const scenarios = response.data.scenarios?.map((scenario: any) => {
+        const scenariosList = scenarioMatches?.map(scenarioContent => {
+          const scenarioName = scenarioContent.match(/Scenario:\s*(.*)/)?.[1] || 'Unnamed Scenario';
+          // Extract step lines from scenario content
+          const stepLines = scenarioContent.split('\n')
+            .filter(line => /^\s*(Given|When|Then|And|But)\s+/.test(line))
+            .map(line => line.trim());
+
+          // Match steps with the lines from scenario content
+          const scenarioSteps = stepLines.map(stepLine => {
+            const [, keyword, text] = stepLine.match(/^\s*(Given|When|Then|And|But)\s+(.+)/) || [];
+            // Find matching step from output.steps
+            const matchingStep = output.steps.find(step => 
+              step.keyword === keyword && step.text === text
+            ) || {
+              keyword,
+              text,
+              status: 'passed',
+              error: undefined
+            };
+            return matchingStep;
+          });
+
           return {
-            name: scenario.name || '',
-            status: scenario.status || 'failed',
-            steps: scenario.steps?.map((step: any) => ({
-              name: step.name || '',
-              text: step.text || '',
-              keyword: step.keyword || '',
-              status: step.status || 'failed',
-              errorMessage: step.errorMessage || step.error || null
-            })) || []
+            name: scenarioName.trim(),
+            steps: scenarioSteps,
+            status: 'passed' as const
           };
         }) || [];
 
         // Update status based on steps
-        scenarios.forEach(scenario => {
-          scenario.status = scenario.steps.some(step => 
-            step.status === 'failed' || (step.status === 'skipped' && step.errorMessage)
-          ) ? 'failed' : 'passed';
+        scenariosList.forEach(scenario => {
+          scenario.status = scenario.steps.some(step => step.errorMessage || step.status === 'failed') 
+            ? 'failed' 
+            : 'passed';
         });
 
         setResult({
-          scenarios,
-          status: scenarios.some(s => s.status === 'failed') ? 'failed' : 'passed',
+          scenariosList,
+          status: scenariosList.some(s => s.status === 'failed') ? 'failed' : 'passed',
           time: response.data.time || 0,
           features: {
             passed: response.data.features?.passed || 0,
             total: response.data.features?.total || 0
           },
           scenarios: {
-            passed: scenarios.filter(s => s.status === 'passed').length,
-            failed: scenarios.filter(s => s.status === 'failed').length,
-            total: scenarios.length
+            passed: scenariosList.filter(s => s.status === 'passed').length,
+            failed: scenariosList.filter(s => s.status === 'failed').length,
+            total: scenariosList.length
           },
-          htmlReport: response.data.htmlReport || ''
+          htmlReport: response.data.output.htmlReport || ''
         });
         setLogs(response.data.rawOutput || '');
         setHtmlReport(response.data.output.htmlReport || '');
@@ -352,7 +365,7 @@ export default function Home() {
     if (!result) return null;
 
     const renderScenarios = () => {
-      if (!result.scenarios?.length) {
+      if (!result.scenariosList?.length) {
         return (
           <div className="text-gray-500 text-center py-4">
             No test results available
@@ -360,7 +373,7 @@ export default function Home() {
         );
       }
 
-      return result.scenarios.map((scenario, index) => {
+      return result.scenariosList.map((scenario, index) => {
         const scenarioId = `scenario-${index}`;
         return (
           <div
