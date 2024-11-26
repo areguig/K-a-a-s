@@ -105,7 +105,7 @@ export default function Home() {
 
     const findStepLine = (stepText: string): number => {
       if (!stepText) return -1;
-      return lines.findIndex(line => {
+      return lines.findIndex((line: string) => {
         if (!line) return false;
         const cleanLine = line.trim().toLowerCase();
         const cleanStep = stepText.trim().toLowerCase();
@@ -113,7 +113,7 @@ export default function Home() {
       }) + 1;
     };
 
-    const processStep = (step: KarateStep) => {
+    const processStep = (step: KarateStep): void => {
       if (step?.status === 'failed' && step.name) {
         const lineNumber = findStepLine(step.name);
         if (lineNumber > 0) {
@@ -192,18 +192,18 @@ export default function Home() {
         const output = response.data.output;
         // Extract scenarios from feature content
         const scenarioMatches = output.featureContent.match(/Scenario:.*?(?=Scenario:|$)/gs);
-        const scenariosList = scenarioMatches?.map(scenarioContent => {
+        const scenariosList = scenarioMatches?.map((scenarioContent: string) => {
           const scenarioName = scenarioContent.match(/Scenario:\s*(.*)/)?.[1] || 'Unnamed Scenario';
           // Extract step lines from scenario content
           const stepLines = scenarioContent.split('\n')
-            .filter(line => /^\s*(Given|When|Then|And|But)\s+/.test(line))
-            .map(line => line.trim());
+            .filter((line: string) => /^\s*(Given|When|Then|And|But)\s+/.test(line))
+            .map((line: string) => line.trim());
 
           // Match steps with the lines from scenario content
-          const scenarioSteps = stepLines.map(stepLine => {
+          const scenarioSteps = stepLines.map((stepLine: string) => {
             const [, keyword, text] = stepLine.match(/^\s*(Given|When|Then|And|But)\s+(.+)/) || [];
             // Find matching step from output.steps
-            const matchingStep = output.steps.find(step => 
+            const matchingStep = output.steps.find((step: any) => 
               step.keyword === keyword && step.text === text
             ) || {
               keyword,
@@ -222,23 +222,23 @@ export default function Home() {
         }) || [];
 
         // Update status based on steps
-        scenariosList.forEach(scenario => {
-          scenario.status = scenario.steps.some(step => step.errorMessage || step.status === 'failed') 
+        scenariosList.forEach((scenario: KarateScenario) => {
+          scenario.status = scenario.steps.some((step: KarateStep) => step.errorMessage || step.status === 'failed') 
             ? 'failed' 
             : 'passed';
         });
 
         setResult({
           scenariosList,
-          status: scenariosList.some(s => s.status === 'failed') ? 'failed' : 'passed',
+          status: scenariosList.some((s: KarateScenario) => s.status === 'failed') ? 'failed' : 'passed',
           time: response.data.time || 0,
           features: {
             passed: response.data.features?.passed || 0,
             total: response.data.features?.total || 0
           },
           scenarios: {
-            passed: scenariosList.filter(s => s.status === 'passed').length,
-            failed: scenariosList.filter(s => s.status === 'failed').length,
+            passed: scenariosList.filter((s: KarateScenario) => s.status === 'passed').length,
+            failed: scenariosList.filter((s: KarateScenario) => s.status === 'failed').length,
             total: scenariosList.length
           },
           htmlReport: response.data.output.htmlReport || ''
@@ -271,7 +271,7 @@ export default function Home() {
   };
 
   // Helper function to determine step status
-  const getStepStatus = (step: any) => {
+  const getStepStatus = (step: KarateStep): 'passed' | 'failed' | 'skipped' => {
     if (step.status === 'failed' || (step.status === 'skipped' && step.errorMessage)) {
       return 'failed';
     }
