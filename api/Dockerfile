@@ -12,12 +12,11 @@ ENV JAVA_OPTS="-XX:+UseJVMCICompiler \
     -Dfile.encoding=UTF-8 \
     -Djava.awt.headless=true"
 
-# Install Node.js
-RUN microdnf update -y && \
-    microdnf install -y curl && \
-    curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
-    microdnf install -y nodejs && \
-    microdnf clean all
+# Install Node.js and npm
+RUN curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
+    dnf install -y nodejs && \
+    dnf clean all && \
+    npm install -g npm@latest
 
 # Create app directory
 WORKDIR /app

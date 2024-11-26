@@ -11,12 +11,22 @@ const execAsync = promisify(exec);
 export interface KarateConfig {
   env?: Record<string, string>;
   configDir?: string;
+  threads?: number;
+  threadMonitoring?: boolean;
   [key: string]: any;
 }
 
 export interface KarateExecutionRequest {
   feature: string;
   config?: KarateConfig;
+}
+
+interface ThreadStats {
+  virtualThreadCount: number;
+  platformThreadCount: number;
+  activeThreads: number;
+  peakThreadCount: number;
+  totalStartedThreadCount: number;
 }
 
 interface StepResult {
@@ -31,12 +41,20 @@ interface StepResult {
     url: string;
     headers: Record<string, string>;
     body?: any;
+    startTime?: number;
+    endTime?: number;
   };
   response?: {
     status: number;
     headers: Record<string, string>;
     body?: any;
     time?: number;
+  };
+  threadInfo?: {
+    id: string;
+    type: 'virtual' | 'platform';
+    startTime: number;
+    endTime: number;
   };
 }
 
@@ -46,21 +64,25 @@ export interface KarateResult {
   time: number;
   featureContent: string;
   steps: StepResult[];
-}
-
-export interface KarateExecutionResponse {
-  success: boolean;
-  output: KarateResult;
-  rawOutput: string;
+  threadStats?: ThreadStats;
+  performanceMetrics?: {
+    avgResponseTime: number;
+    maxResponseTime: number;
+    minResponseTime: number;
+    concurrentThreadsMax: number;
+    totalThreadsUsed: number;
+  };
 }
 
 @Injectable()
 export class KarateService {
   private readonly logger = new Logger(KarateService.name);
   private readonly karatePath: string;
+  private readonly threadStatsPath: string;
 
   constructor() {
     this.karatePath = path.join(__dirname, '../../lib/karate.jar');
+    this.threadStatsPath = path.join(os.tmpdir(), 'karate-thread-stats.json');
   }
 
   private async createTempFeatureFile(content: string): Promise<string> {
@@ -76,16 +98,157 @@ export class KarateService {
     }
   }
 
-  private async createTempConfigFile(config: KarateConfig): Promise<string> {
+  private async createThreadMonitoringAgent(): Promise<string> {
+    const agentContent = `
+    public class ThreadMonitoringAgent {
+      public static void premain(String args) {
+        Thread.startVirtualThread(() -> {
+          try {
+            while (true) {
+              ThreadStats stats = new ThreadStats();
+              stats.virtualThreadCount = Thread.getAllStackTraces().keySet()
+                .stream().filter(Thread::isVirtual).count();
+              stats.platformThreadCount = Thread.getAllStackTraces().keySet()
+                .stream().filter(t -> !t.isVirtual()).count();
+              stats.activeThreads = Thread.activeCount();
+              stats.peakThreadCount = Thread.getAllStackTraces().size();
+              stats.totalStartedThreadCount = stats.virtualThreadCount + stats.platformThreadCount;
+              
+              // Write stats to file
+              try (FileWriter writer = new FileWriter("${this.threadStatsPath}")) {
+                writer.write(new com.intuit.karate.JsonUtils.toJson(stats));
+              }
+              Thread.sleep(1000);
+            }
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+        });
+      }
+    }`;
+
+    const agentPath = path.join(os.tmpdir(), 'ThreadMonitoringAgent.java');
+    await fsPromises.writeFile(agentPath, agentContent);
+    
+    // Compile the agent
+    await execAsync(`javac -source 21 --enable-preview ${agentPath}`);
+    
+    // Create JAR file
+    const jarPath = path.join(os.tmpdir(), 'thread-monitoring-agent.jar');
+    await execAsync(`jar cmf META-INF/MANIFEST.MF ${jarPath} ThreadMonitoringAgent.class`);
+    
+    return jarPath;
+  }
+
+  async execute(request: KarateExecutionRequest): Promise<KarateExecutionResponse> {
+    const tempDirs: string[] = [];
+    let monitoringAgent: string | undefined;
+    
     try {
-      const tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'karate-config-'));
-      const configPath = path.join(tempDir, 'karate-config.js');
-      const configContent = `function fn() { return ${JSON.stringify(config)}; }`;
-      await fsPromises.writeFile(configPath, configContent);
-      this.logger.debug(`Created temporary config file at: ${configPath}`);
-      return configPath;
+      const featurePath = await this.createTempFeatureFile(request.feature);
+      const tempDir = path.dirname(featurePath);
+      tempDirs.push(tempDir);
+
+      let configPath: string | undefined;
+      if (request.config) {
+        configPath = await this.createTempConfigFile(request.config);
+        tempDirs.push(path.dirname(configPath));
+      }
+
+      // Create thread monitoring agent if requested
+      if (request.config?.threadMonitoring) {
+        monitoringAgent = await this.createThreadMonitoringAgent();
+      }
+
+      try {
+        const jvmArgs = [
+          // Enable preview features and virtual threads
+          '--enable-preview',
+          
+          // Virtual threads configuration
+          '-Djdk.virtualThreadScheduler.parallelism=32',
+          '-Djdk.virtualThreadScheduler.maxPoolSize=256',
+          '-Djava.util.concurrent.ForkJoinPool.common.parallelism=32',
+          
+          // Thread monitoring
+          monitoringAgent ? `-javaagent:${monitoringAgent}` : '',
+          
+          // GraalVM optimizations
+          '-XX:+UseJVMCICompiler',
+          '-XX:+EnableVectorSupport',
+          '-XX:+UseG1GC',
+          '-XX:+UseStringDeduplication',
+          '-XX:+OptimizeStringConcat',
+          
+          // Karate optimizations
+          '-Dkarate.env.parallel=true',
+          '-Dkarate.timeoutInterval=5000',
+          '-Dkarate.http.ssl.allowInsecure=true',
+          '-Dkarate.http.connectTimeout=10000',
+          '-Dkarate.http.readTimeout=10000',
+          `-Dkarate.config.dir=${configPath ? path.dirname(configPath) : ''}`,
+          `-Dkarate.output.dir=${tempDir}`,
+          
+          // System settings
+          '-Dfile.encoding=UTF-8',
+          '-Djava.awt.headless=true'
+        ].filter(Boolean);
+
+        const args = [...jvmArgs, '-jar', this.karatePath];
+        
+        if (request.config?.threads) {
+          args.push('--threads', request.config.threads.toString());
+        }
+        
+        if (configPath) {
+          args.push('--configdir', path.dirname(configPath));
+        }
+        
+        args.push(featurePath);
+
+        const command = `java ${args.join(' ')}`;
+        this.logger.debug(`Executing command: ${command}`);
+
+        const { stdout } = await execAsync(command, {
+          maxBuffer: 50 * 1024 * 1024,
+          timeout: 120000,
+          env: {
+            ...process.env,
+            JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS,
+            JAVA_THREADS: 'virtual'
+          }
+        });
+
+        // Read thread stats if monitoring was enabled
+        let threadStats: ThreadStats | undefined;
+        if (monitoringAgent && await fsPromises.access(this.threadStatsPath).then(() => true).catch(() => false)) {
+          const statsContent = await fsPromises.readFile(this.threadStatsPath, 'utf8');
+          threadStats = JSON.parse(statsContent);
+        }
+
+        const result = this.parseKarateOutput(stdout, request.feature);
+        if (threadStats) {
+          result.threadStats = threadStats;
+        }
+
+        return {
+          success: true,
+          output: result,
+          rawOutput: stdout
+        };
+
+      } finally {
+        await Promise.all([
+          ...tempDirs.map(dir => 
+            fsPromises.rm(dir, { recursive: true, force: true })
+              .catch(err => this.logger.error(`Error cleaning up temp directory ${dir}:`, err))
+          ),
+          monitoringAgent ? fsPromises.unlink(monitoringAgent).catch(() => {}) : Promise.resolve(),
+          fsPromises.unlink(this.threadStatsPath).catch(() => {})
+        ]);
+      }
     } catch (error) {
-      this.logger.error('Error creating temp config file:', error);
+      this.logger.error('Error executing Karate:', error);
       throw error;
     }
   }
@@ -273,98 +436,6 @@ export class KarateService {
       return result;
     } catch (error) {
       this.logger.error('Error parsing Karate output:', error);
-      throw error;
-    }
-  }
-
-  async execute(request: KarateExecutionRequest): Promise<KarateExecutionResponse> {
-    const tempDirs: string[] = [];
-    try {
-      // Create temporary feature file
-      const featurePath = await this.createTempFeatureFile(request.feature);
-      const tempDir = path.dirname(featurePath);
-      tempDirs.push(tempDir);
-
-      // Create temporary config file if provided
-      let configPath: string | undefined;
-      if (request.config) {
-        configPath = await this.createTempConfigFile(request.config);
-        tempDirs.push(path.dirname(configPath));
-      }
-
-      try {
-        // Build command with virtual threads and GraalVM optimizations
-        const jvmArgs = [
-          // Enable preview features for virtual threads
-          '--enable-preview',
-          
-          // Virtual threads and concurrency optimizations
-          '-Djdk.virtualThreadScheduler.parallelism=32',
-          '-Djdk.virtualThreadScheduler.maxPoolSize=256',
-          '-Djava.util.concurrent.ForkJoinPool.common.parallelism=32',
-          
-          // GraalVM specific optimizations
-          '-XX:+UseJVMCICompiler',
-          '-XX:+EnableVectorSupport',
-          '-XX:+UseG1GC',
-          '-XX:+UseStringDeduplication',
-          '-XX:+OptimizeStringConcat',
-          '-XX:MaxGCPauseMillis=100',
-          
-          // Karate specific optimizations
-          '-Dkarate.env=dev',
-          '-Dkarate.config.dir=' + (configPath ? path.dirname(configPath) : ''),
-          '-Dkarate.output.dir=' + tempDir,
-          
-          // System settings
-          '-Dfile.encoding=UTF-8',
-          '-Djava.awt.headless=true',
-          
-          // Performance monitoring
-          '-Dcom.sun.management.jmxremote',
-          '-Dcom.sun.management.jmxremote.port=3333',
-          '-Dcom.sun.management.jmxremote.authenticate=false',
-          '-Dcom.sun.management.jmxremote.ssl=false'
-        ];
-        
-        const args = [...jvmArgs, '-jar', this.karatePath];
-        if (configPath) {
-          args.push('--configdir', path.dirname(configPath));
-        }
-        args.push(featurePath);
-
-        // Execute Karate with increased buffer and timeout
-        const command = `java ${args.join(' ')}`;
-        this.logger.debug(`Executing command: ${command}`);
-        
-        const { stdout } = await execAsync(command, {
-          maxBuffer: 50 * 1024 * 1024, // Increase buffer size to 50MB
-          timeout: 120000, // Set timeout to 120 seconds
-          env: {
-            ...process.env,
-            JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS, // Pass JVM options from environment
-            JAVA_THREADS: 'virtual' // Enable virtual threads
-          }
-        });
-
-        // Parse and return results
-        const result = this.parseKarateOutput(stdout, request.feature);
-        return {
-          success: true,
-          output: result,
-          rawOutput: stdout
-        };
-      } finally {
-        // Cleanup temp directories in parallel
-        await Promise.all(
-          tempDirs.map(dir =>
-            fsPromises.rm(dir, { recursive: true, force: true })
-              .catch(err => this.logger.error(`Error cleaning up temp directory ${dir}:`, err))
-          )
-        );
-      }
-    } catch (error) {
-      this.logger.error('Error executing Karate:', error);
       throw error;
     }
   }
