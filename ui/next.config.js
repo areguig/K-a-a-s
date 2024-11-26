@@ -3,8 +3,9 @@ const nextConfig = {
   reactStrictMode: false,
   swcMinify: true,
   output: 'export',
+  distDir: 'out',
   trailingSlash: true,
-  assetPrefix: '/',
+  assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || '',
   experimental: {
     optimizePackageImports: ['@monaco-editor/react']
   },
@@ -16,6 +17,16 @@ const nextConfig = {
   },
   images: {
     unoptimized: true
+  },
+  webpack: (config, { isServer }) => {
+    // Fixes npm packages that depend on `fs` module
+    if (!isServer) {
+      config.resolve.fallback = {
+        fs: false,
+        path: false,
+      }
+    }
+    return config
   }
 }
 
