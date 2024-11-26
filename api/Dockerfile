@@ -2,10 +2,12 @@
 FROM ghcr.io/graalvm/graalvm-community:21 as base
 
 # Set environment variables for Java
-ENV JAVA_OPTS="-XX:+UseJVMCICompiler \
+ENV JAVA_OPTS="\
     --enable-preview \
-    -Djava.util.concurrent.ForkJoinPool.common.parallelism=32 \
+    -XX:+UnlockExperimentalVMOptions \
     -XX:+EnableVectorSupport \
+    -XX:+UseJVMCICompiler \
+    -Djava.util.concurrent.ForkJoinPool.common.parallelism=32 \
     -XX:+UseG1GC \
     -XX:+UseStringDeduplication \
     -XX:MaxGCPauseMillis=100 \
