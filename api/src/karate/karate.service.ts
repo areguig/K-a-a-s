@@ -3,10 +3,11 @@ import * as fs from 'fs';
 import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import * as childProcess from 'child_process';
 import { promisify } from 'util';
-import { exec } from 'child_process';
 
-const execAsync = promisify(exec);
+const execAsync = promisify(childProcess.exec);
+const spawn = childProcess.spawn;
 
 export interface KarateConfig {
   env?: Record<string, string>;
@@ -85,10 +86,74 @@ export class KarateService {
   private readonly logger = new Logger(KarateService.name);
   private readonly karatePath: string;
   private readonly threadStatsPath: string;
+  private javaProcess: childProcess.ChildProcess | null = null;
+  private isJvmStarting = false;
+  private readonly jvmStartPromise: Promise<void>;
 
   constructor() {
     this.karatePath = path.join(__dirname, '../../lib/karate.jar');
     this.threadStatsPath = path.join(os.tmpdir(), 'karate-thread-stats.json');
+    this.jvmStartPromise = this.startJvm();
+  }
+
+  private async startJvm(): Promise<void> {
+    if (this.isJvmStarting || this.javaProcess) {
+      return;
+    }
+
+    this.isJvmStarting = true;
+    try {
+      const baseJvmArgs = (process.env.JAVA_OPTS || '').split(/\s+/).filter(Boolean);
+      const jvmArgs = [
+        ...baseJvmArgs,
+        '-XX:InitialRAMPercentage=50.0',
+        '-XX:MaxRAMPercentage=80.0',
+        '-Dkarate.env.parallel=false',
+        '-jar', this.karatePath,
+        '--server'  // Run Karate in server mode
+      ];
+
+      this.javaProcess = spawn('java', jvmArgs, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS
+        }
+      });
+
+      // Handle process events
+      this.javaProcess.on('error', (err) => {
+        this.logger.error('JVM process error:', err);
+        this.javaProcess = null;
+      });
+
+      this.javaProcess.on('exit', (code) => {
+        this.logger.warn(`JVM process exited with code ${code}`);
+        this.javaProcess = null;
+      });
+
+      // Wait for JVM to be ready
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('JVM startup timeout'));
+        }, 10000);
+
+        this.javaProcess!.stdout!.on('data', (data) => {
+          if (data.toString().includes('Karate server ready')) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      });
+    } finally {
+      this.isJvmStarting = false;
+    }
+  }
+
+  private async ensureJvmRunning(): Promise<void> {
+    if (!this.javaProcess) {
+      await this.startJvm();
+    }
   }
 
   private async createTempFeatureFile(content: string): Promise<string> {
@@ -161,6 +226,7 @@ export class KarateService {
   }
 
   async execute(request: KarateExecutionRequest): Promise<KarateExecutionResponse> {
+    await this.ensureJvmRunning();
     const tempDirs: string[] = [];
     let monitoringAgent: string | undefined;
     
@@ -181,67 +247,37 @@ export class KarateService {
       }
 
       try {
-        const baseJvmArgs = (process.env.JAVA_OPTS || '').split(/\s+/).filter(Boolean);
-        const additionalJvmArgs = [
-          // Thread monitoring
-          monitoringAgent ? `-javaagent:${monitoringAgent}` : '',
-        
-          // Karate-specific optimizations only (removing duplicated JVM options)
-          '-Dkarate.env.parallel=false',
-          '-Dkarate.timeoutInterval=5000',
-          '-Dkarate.http.ssl.allowInsecure=true',
-          '-Dkarate.http.connectTimeout=5000',
-          '-Dkarate.http.readTimeout=5000',
-          // Resource-specific settings for render.com
-          '-XX:InitialRAMPercentage=50.0',
-          '-XX:MaxRAMPercentage=80.0',
-          `-Dkarate.config.dir=${configPath ? path.dirname(configPath) : ''}`,
-          `-Dkarate.output.dir=${tempDir}`
-        ].filter(Boolean);
+        // Send test execution command to the running JVM
+        const command = JSON.stringify({
+          feature: featurePath,
+          config: configPath,
+          outputDir: tempDir
+        });
 
-        const args = [...baseJvmArgs, ...additionalJvmArgs, '-jar', this.karatePath];
-        
-        if (request.config?.threads) {
-          args.push('--threads', request.config.threads.toString());
-        }
-        
-        if (configPath) {
-          args.push('--configdir', path.dirname(configPath));
-        }
-        
-        args.push(featurePath);
+        return new Promise((resolve, reject) => {
+          this.javaProcess!.stdin!.write(command + '\n');
+          
+          let output = '';
+          const timeout = setTimeout(() => {
+            reject(new Error('Test execution timeout'));
+          }, 60000);
 
-        const command = `java ${args.join(' ')}`;
-        this.logger.debug(`Executing command: ${command}`);
-
-        try {
-          const { stdout, stderr } = await execAsync(command, {
-            maxBuffer: 10 * 1024 * 1024,
-            timeout: 60000,
-            env: {
-              ...process.env,
-              JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS
+          const dataHandler = (data: Buffer) => {
+            output += data.toString();
+            if (output.includes('TEST_COMPLETE')) {
+              clearTimeout(timeout);
+              const result = this.parseKarateOutput(output, request.feature);
+              resolve({
+                success: result.scenarios.failed === 0,
+                output: result,
+                rawOutput: output
+              });
             }
-          });
+          };
 
-          const result = this.parseKarateOutput(stdout, request.feature);
-          
-          // Check if there were test failures
-          const hasFailures = result.scenarios.failed > 0 || result.features.failed > 0;
-          
-          return {
-            success: !hasFailures,
-            output: result,
-            rawOutput: stderr ? `${stdout}\n${stderr}` : stdout
-          };
-        } catch (execError: any) {
-          const result = this.parseKarateOutput(execError.stdout || '', request.feature);
-          return {
-            success: false,
-            output: result,
-            rawOutput: execError.stderr ? `${execError.stdout || ''}\n${execError.stderr}` : (execError.stdout || '')
-          };
-        }
+          this.javaProcess!.stdout!.on('data', dataHandler);
+          this.javaProcess!.stderr!.on('data', dataHandler);
+        });
 
       } finally {
         await Promise.all([
@@ -249,8 +285,7 @@ export class KarateService {
             fsPromises.rm(dir, { recursive: true, force: true })
               .catch(err => this.logger.error(`Error cleaning up temp directory ${dir}:`, err))
           ),
-          monitoringAgent ? fsPromises.unlink(monitoringAgent).catch(() => {}) : Promise.resolve(),
-          fsPromises.unlink(this.threadStatsPath).catch(() => {})
+          monitoringAgent ? fsPromises.unlink(monitoringAgent).catch(() => {}) : Promise.resolve()
         ]);
       }
     } catch (error) {

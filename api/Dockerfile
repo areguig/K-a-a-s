@@ -30,6 +30,12 @@ RUN mkdir -p lib
 # Download Karate JAR
 RUN curl -L -o lib/karate.jar https://github.com/karatelabs/karate/releases/download/v1.4.0/karate-1.4.0.jar
 
+# Create Java source directory and compile KarateServer
+COPY src/main/java/KarateServer.java /app/src/main/java/
+RUN mkdir -p classes && \
+    javac -cp lib/karate.jar:/app/lib/* -d classes src/main/java/KarateServer.java && \
+    jar uf lib/karate.jar -C classes .
+
 # Copy package files
 COPY package*.json ./
 
