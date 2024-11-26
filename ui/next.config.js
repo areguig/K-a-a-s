@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: false,
   swcMinify: true,
+  output: 'export',
   experimental: {
     optimizePackageImports: ['@monaco-editor/react']
   },
@@ -10,6 +11,9 @@ const nextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: false
+  },
+  images: {
+    unoptimized: true
   }
 }
 

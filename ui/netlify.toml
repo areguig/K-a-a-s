@@ -1,7 +1,7 @@
 [build]
   base = "ui"
   command = "npm run build"
-  publish = ".next"
+  publish = "out"
 
 [build.environment]
   NEXT_TELEMETRY_DISABLED = "1"
@@ -16,3 +16,4 @@
   from = "/*"
   to = "/index.html"
   status = 200
+  force = true
