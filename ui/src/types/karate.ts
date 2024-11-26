@@ -31,4 +31,6 @@ export interface KarateResult {
     failed: number;
   };
   htmlReport?: string;
+  logs?: string[];
+  rawOutput?: string;
 }
