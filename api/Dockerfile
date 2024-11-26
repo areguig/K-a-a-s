@@ -14,9 +14,10 @@ ENV JAVA_OPTS="-XX:+UseJVMCICompiler \
 
 # Install Node.js and npm
 RUN curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
-    dnf install -y nodejs && \
-    dnf clean all && \
-    npm install -g npm@latest
+    microdnf install -y nodejs && \
+    microdnf clean all && \
+    npm install -g npm@latest && \
+    npm install -g @nestjs/cli
 
 # Create app directory
 WORKDIR /app
@@ -25,7 +26,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -34,7 +35,8 @@ COPY . .
 RUN npm run build
 
 # Clean up development dependencies
-RUN npm prune --production
+RUN npm prune --production && \
+    npm uninstall -g @nestjs/cli
 
 # Set environment variables
 ENV NODE_ENV=production

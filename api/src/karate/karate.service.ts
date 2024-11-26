@@ -74,6 +74,12 @@ export interface KarateResult {
   };
 }
 
+export interface KarateExecutionResponse {
+  success: boolean;
+  output: KarateResult;
+  rawOutput: string;
+}
+
 @Injectable()
 export class KarateService {
   private readonly logger = new Logger(KarateService.name);
@@ -94,6 +100,20 @@ export class KarateService {
       return featurePath;
     } catch (error) {
       this.logger.error('Error creating temp feature file:', error);
+      throw error;
+    }
+  }
+
+  private async createTempConfigFile(config: KarateConfig): Promise<string> {
+    try {
+      const tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'karate-config-'));
+      const configPath = path.join(tempDir, 'karate-config.js');
+      const configContent = `function fn() { return ${JSON.stringify(config)}; }`;
+      await fsPromises.writeFile(configPath, configContent);
+      this.logger.debug(`Created temporary config file at: ${configPath}`);
+      return configPath;
+    } catch (error) {
+      this.logger.error('Error creating temp config file:', error);
       throw error;
     }
   }
