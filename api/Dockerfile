@@ -6,10 +6,12 @@ ENV JAVA_OPTS="\
     --enable-preview \
     -XX:+UnlockExperimentalVMOptions \
     -XX:+EnableVectorSupport \
-    -XX:+UseJVMCICompiler \
+    -Djdk.virtualThreadScheduler.parallelism=32 \
+    -Djdk.virtualThreadScheduler.maxPoolSize=256 \
     -Djava.util.concurrent.ForkJoinPool.common.parallelism=32 \
     -XX:+UseG1GC \
     -XX:+UseStringDeduplication \
+    -XX:+OptimizeStringConcat \
     -XX:MaxGCPauseMillis=100 \
     -Dfile.encoding=UTF-8 \
     -Djava.awt.headless=true"
@@ -21,8 +23,12 @@ RUN curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
     npm install -g npm@latest && \
     npm install -g @nestjs/cli
 
-# Create app directory
+# Create app directory and lib directory
 WORKDIR /app
+RUN mkdir -p lib
+
+# Download Karate JAR
+RUN curl -L -o lib/karate.jar https://github.com/karatelabs/karate/releases/download/v1.4.0/karate-1.4.0.jar
 
 # Copy package files
 COPY package*.json ./
@@ -48,4 +54,4 @@ ENV PORT=3001
 EXPOSE $PORT
 
 # Start the application
-CMD ["npm", "run", "start:prod"]
+CMD ["node", "dist/main"]

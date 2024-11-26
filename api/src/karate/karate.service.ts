@@ -181,40 +181,22 @@ export class KarateService {
       }
 
       try {
-        const jvmArgs = [
-          // Enable preview features and virtual threads
-          '--enable-preview',
-          
-          // Virtual threads configuration
-          '-Djdk.virtualThreadScheduler.parallelism=32',
-          '-Djdk.virtualThreadScheduler.maxPoolSize=256',
-          '-Djava.util.concurrent.ForkJoinPool.common.parallelism=32',
-          
+        const baseJvmArgs = (process.env.JAVA_OPTS || '').split(/\s+/).filter(Boolean);
+        const additionalJvmArgs = [
           // Thread monitoring
           monitoringAgent ? `-javaagent:${monitoringAgent}` : '',
           
-          // GraalVM optimizations
-          '-XX:+UseJVMCICompiler',
-          '-XX:+EnableVectorSupport',
-          '-XX:+UseG1GC',
-          '-XX:+UseStringDeduplication',
-          '-XX:+OptimizeStringConcat',
-          
-          // Karate optimizations
+          // Karate-specific optimizations
           '-Dkarate.env.parallel=true',
           '-Dkarate.timeoutInterval=5000',
           '-Dkarate.http.ssl.allowInsecure=true',
           '-Dkarate.http.connectTimeout=10000',
           '-Dkarate.http.readTimeout=10000',
           `-Dkarate.config.dir=${configPath ? path.dirname(configPath) : ''}`,
-          `-Dkarate.output.dir=${tempDir}`,
-          
-          // System settings
-          '-Dfile.encoding=UTF-8',
-          '-Djava.awt.headless=true'
+          `-Dkarate.output.dir=${tempDir}`
         ].filter(Boolean);
 
-        const args = [...jvmArgs, '-jar', this.karatePath];
+        const args = [...baseJvmArgs, ...additionalJvmArgs, '-jar', this.karatePath];
         
         if (request.config?.threads) {
           args.push('--threads', request.config.threads.toString());
@@ -229,33 +211,35 @@ export class KarateService {
         const command = `java ${args.join(' ')}`;
         this.logger.debug(`Executing command: ${command}`);
 
-        const { stdout } = await execAsync(command, {
-          maxBuffer: 50 * 1024 * 1024,
-          timeout: 120000,
-          env: {
-            ...process.env,
-            JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS,
-            JAVA_THREADS: 'virtual'
-          }
-        });
+        try {
+          const { stdout, stderr } = await execAsync(command, {
+            maxBuffer: 50 * 1024 * 1024,
+            timeout: 120000,
+            env: {
+              ...process.env,
+              JAVA_TOOL_OPTIONS: process.env.JAVA_OPTS,
+              JAVA_THREADS: 'virtual'
+            }
+          });
 
-        // Read thread stats if monitoring was enabled
-        let threadStats: ThreadStats | undefined;
-        if (monitoringAgent && await fsPromises.access(this.threadStatsPath).then(() => true).catch(() => false)) {
-          const statsContent = await fsPromises.readFile(this.threadStatsPath, 'utf8');
-          threadStats = JSON.parse(statsContent);
+          const result = this.parseKarateOutput(stdout, request.feature);
+          
+          // Check if there were test failures
+          const hasFailures = result.scenarios.failed > 0 || result.features.failed > 0;
+          
+          return {
+            success: !hasFailures,
+            output: result,
+            rawOutput: stderr ? `${stdout}\n${stderr}` : stdout
+          };
+        } catch (execError: any) {
+          const result = this.parseKarateOutput(execError.stdout || '', request.feature);
+          return {
+            success: false,
+            output: result,
+            rawOutput: execError.stderr ? `${execError.stdout || ''}\n${execError.stderr}` : (execError.stdout || '')
+          };
         }
-
-        const result = this.parseKarateOutput(stdout, request.feature);
-        if (threadStats) {
-          result.threadStats = threadStats;
-        }
-
-        return {
-          success: true,
-          output: result,
-          rawOutput: stdout
-        };
 
       } finally {
         await Promise.all([
