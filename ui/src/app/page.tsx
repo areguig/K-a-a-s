@@ -18,6 +18,8 @@ interface KarateVersions {
 
 interface KarateStep {
   name: string;
+  text: string;
+  keyword?: string;
   status: 'passed' | 'failed' | 'skipped';
   errorMessage?: string;
 }
@@ -30,7 +32,7 @@ interface KarateScenario {
 
 interface KarateResult {
   scenario?: KarateScenario;
-  scenarios?: KarateScenario[];
+  scenarios: KarateScenario[];
   steps?: KarateStep[];
   status: 'passed' | 'failed';
   time?: number;
@@ -91,6 +93,8 @@ export default function Home() {
   const [htmlReport, setHtmlReport] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [editorRef, setEditorRef] = useState<editor.IStandaloneCodeEditor | null>(null);
+  const [expandedScenarios, setExpandedScenarios] = useState<{ [key: string]: boolean }>({});
+  const [expandedErrors, setExpandedErrors] = useState<{ [key: string]: boolean }>({});
 
   const highlightFailedSteps = (editor: editor.IStandaloneCodeEditor, monaco: any, result: KarateResult) => {
     if (!editor || !result) return;
@@ -190,45 +194,41 @@ export default function Home() {
         const output = response.data.output;
         // Extract scenarios from feature content
         const scenarioMatches = output.featureContent.match(/Scenario:.*?(?=Scenario:|$)/gs);
-        const scenarios = scenarioMatches?.map(scenarioContent => {
-          const scenarioName = scenarioContent.match(/Scenario:\s*(.*)/)?.[1] || 'Unnamed Scenario';
-          // Extract step lines from scenario content
-          const stepLines = scenarioContent.split('\n')
-            .filter(line => /^\s*(Given|When|Then|And|But)\s+/.test(line))
-            .map(line => line.trim());
-
-          // Match steps with the lines from scenario content
-          const scenarioSteps = stepLines.map(stepLine => {
-            const [, keyword, text] = stepLine.match(/^\s*(Given|When|Then|And|But)\s+(.+)/) || [];
-            // Find matching step from output.steps
-            const matchingStep = output.steps.find(step => 
-              step.keyword === keyword && step.text === text
-            ) || {
-              keyword,
-              text,
-              status: 'passed',
-              error: undefined
-            };
-            return matchingStep;
-          });
-
+        const scenarios = response.data.scenarios?.map((scenario: any) => {
           return {
-            name: scenarioName.trim(),
-            steps: scenarioSteps,
-            status: 'passed' as const
+            name: scenario.name || '',
+            status: scenario.status || 'failed',
+            steps: scenario.steps?.map((step: any) => ({
+              name: step.name || '',
+              text: step.text || '',
+              keyword: step.keyword || '',
+              status: step.status || 'failed',
+              errorMessage: step.errorMessage || step.error || null
+            })) || []
           };
         }) || [];
 
         // Update status based on steps
         scenarios.forEach(scenario => {
-          scenario.status = scenario.steps.some(step => step.error || step.status === 'failed') 
-            ? 'failed' 
-            : 'passed';
+          scenario.status = scenario.steps.some(step => 
+            step.status === 'failed' || (step.status === 'skipped' && step.errorMessage)
+          ) ? 'failed' : 'passed';
         });
 
         setResult({
-          ...output,
-          scenarios
+          scenarios,
+          status: scenarios.some(s => s.status === 'failed') ? 'failed' : 'passed',
+          time: response.data.time || 0,
+          features: {
+            passed: response.data.features?.passed || 0,
+            total: response.data.features?.total || 0
+          },
+          scenarios: {
+            passed: scenarios.filter(s => s.status === 'passed').length,
+            failed: scenarios.filter(s => s.status === 'failed').length,
+            total: scenarios.length
+          },
+          htmlReport: response.data.htmlReport || ''
         });
         setLogs(response.data.rawOutput || '');
         setHtmlReport(response.data.output.htmlReport || '');
@@ -243,37 +243,56 @@ export default function Home() {
     }
   };
 
+  const toggleScenario = (scenarioId: string) => {
+    setExpandedScenarios(prev => ({
+      ...prev,
+      [scenarioId]: !prev[scenarioId]
+    }));
+  };
+
+  const toggleError = (stepId: string) => {
+    setExpandedErrors(prev => ({
+      ...prev,
+      [stepId]: !prev[stepId]
+    }));
+  };
+
+  // Helper function to determine step status
+  const getStepStatus = (step: any) => {
+    if (step.status === 'failed' || (step.status === 'skipped' && step.errorMessage)) {
+      return 'failed';
+    }
+    return step.status;
+  };
+
   const StepView = ({ step }: { step: KarateStep }) => {
-    const [showLogs, setShowLogs] = useState(false);
-    // If there's an error message, treat it as failed regardless of status
-    const effectiveStatus = step.errorMessage ? 'failed' : step.status;
+    const stepStatus = getStepStatus(step);
     
     return (
       <div className={`step p-2 border-l-4 ${
-        effectiveStatus === 'passed' ? 'border-green-500 bg-green-50' : 
-        effectiveStatus === 'failed' ? 'border-red-500 bg-red-50' : 
+        stepStatus === 'passed' ? 'border-green-500 bg-green-50' : 
+        stepStatus === 'failed' ? 'border-red-500 bg-red-50' : 
         'border-gray-500 bg-gray-50'
       } mb-2`}>
         <div 
           className="flex items-center cursor-pointer"
-          onClick={() => step.errorMessage && setShowLogs(!showLogs)}
         >
           <span className={`status-icon mr-2 ${
-            effectiveStatus === 'passed' ? 'text-green-500' : 
-            effectiveStatus === 'failed' ? 'text-red-500' : 
+            stepStatus === 'passed' ? 'text-green-500' : 
+            stepStatus === 'failed' ? 'text-red-500' : 
             'text-gray-500'
           }`}>
-            {effectiveStatus === 'passed' ? '✓' : effectiveStatus === 'failed' ? '✗' : '○'}
+            {stepStatus === 'passed' ? '✓' : stepStatus === 'failed' ? '✗' : '○'}
           </span>
           <span className="font-medium">{step.name}</span>
           {step.errorMessage && (
             <span className="text-sm text-gray-600 ml-2">
-              {showLogs ? '▼' : '▶'}
+              ▶
             </span>
           )}
         </div>
         
-        {showLogs && step.errorMessage && (
+        {step.errorMessage && (
           <div className="step-logs mt-2 pl-6">
             <pre className="text-sm text-red-600 bg-red-50 p-2 rounded">
               {step.errorMessage}
@@ -341,14 +360,97 @@ export default function Home() {
         );
       }
 
-      return result.scenarios.map((scenario, index) => (
-        <ScenarioView
-          key={index}
-          scenario={scenario.name}
-          steps={scenario.steps}
-          status={scenario.status}
-        />
-      ));
+      return result.scenarios.map((scenario, index) => {
+        const scenarioId = `scenario-${index}`;
+        return (
+          <div
+            key={index}
+            className={`border rounded-lg ${
+              scenario.status === 'failed' ? 'border-red-200' : 'border-green-200'
+            }`}
+          >
+            <div
+              onClick={() => toggleScenario(scenarioId)}
+              className={`p-4 flex items-center justify-between cursor-pointer ${
+                scenario.status === 'failed' ? 'bg-red-50' : 'bg-green-50'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <span className={scenario.status === 'failed' ? 'text-red-500' : 'text-green-500'}>
+                  {scenario.status === 'failed' ? '✗' : '✓'}
+                </span>
+                <h3 className="font-medium">{scenario.name}</h3>
+              </div>
+              <span className="transform transition-transform duration-200" style={{ 
+                transform: expandedScenarios[scenarioId] ? 'rotate(90deg)' : 'rotate(0deg)'
+              }}>
+                ▶
+              </span>
+            </div>
+            {expandedScenarios[scenarioId] && (
+              <div className="p-4 space-y-2">
+                {scenario.steps && scenario.steps.map((step, stepIndex) => {
+                  const stepId = `${scenarioId}-step-${stepIndex}`;
+                  const stepStatus = getStepStatus(step);
+                  return (
+                    <div
+                      key={stepIndex}
+                      className={`p-2 rounded ${
+                        stepStatus === 'failed'
+                          ? 'bg-red-50 border-l-4 border-red-500'
+                          : stepStatus === 'passed'
+                          ? 'bg-green-50 border-l-4 border-green-500'
+                          : 'bg-gray-50 border-l-4 border-gray-500'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <span
+                          className={`mr-2 ${
+                            stepStatus === 'failed'
+                              ? 'text-red-500'
+                              : stepStatus === 'passed'
+                              ? 'text-green-500'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          {stepStatus === 'passed' ? '✓' : stepStatus === 'failed' ? '✗' : '○'}
+                        </span>
+                        <span className="text-gray-700">
+                          {step.keyword && <span className="font-medium">{step.keyword} </span>}
+                          {step.text}
+                        </span>
+                      </div>
+                      {step.errorMessage && (
+                        <div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleError(stepId);
+                            }}
+                            className="mt-2 text-sm text-red-600 hover:text-red-800 flex items-center"
+                          >
+                            <span className="transform transition-transform duration-200 mr-1" style={{ 
+                              transform: expandedErrors[stepId] ? 'rotate(90deg)' : 'rotate(0deg)'
+                            }}>
+                              ▶
+                            </span>
+                            Show Error
+                          </button>
+                          {expandedErrors[stepId] && (
+                            <pre className="mt-2 p-2 text-sm text-red-600 bg-red-50 rounded overflow-x-auto">
+                              {step.errorMessage}
+                            </pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      });
     };
 
     return (
@@ -360,17 +462,23 @@ export default function Home() {
               <div className="text-lg font-bold">
                 {result.scenarios.passed}/{result.scenarios.total}
               </div>
-              <div className="text-sm text-gray-600">Scenarios Passed</div>
+              <div className="text-sm text-gray-600 mt-2">
+                Scenarios Passed
+              </div>
             </div>
             <div>
               <div className="text-lg font-bold">
                 {result.features.passed}/{result.features.total}
               </div>
-              <div className="text-sm text-gray-600">Features Passed</div>
+              <div className="text-sm text-gray-600 mt-2">
+                Features Passed
+              </div>
             </div>
             <div>
               <div className="text-lg font-bold">{result.time || 0}ms</div>
-              <div className="text-sm text-gray-600">Execution Time</div>
+              <div className="text-sm text-gray-600 mt-2">
+                Execution Time
+              </div>
             </div>
           </div>
         </div>
@@ -581,80 +689,24 @@ export default function Home() {
                     <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                       <div className="text-green-800 font-medium">Passed</div>
                       <div className="text-2xl font-bold text-green-900">
-                        {result.scenarios.filter(s => s.status === 'passed').length}
+                        {result.scenarios.passed}
                       </div>
                     </div>
                     <div className="bg-red-50 p-4 rounded-lg border border-red-200">
                       <div className="text-red-800 font-medium">Failed</div>
                       <div className="text-2xl font-bold text-red-900">
-                        {result.scenarios.filter(s => s.status === 'failed').length}
+                        {result.scenarios.failed}
                       </div>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                       <div className="text-gray-800 font-medium">Total</div>
                       <div className="text-2xl font-bold text-gray-900">
-                        {result.scenarios.length}
+                        {result.scenarios.total}
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    {result.scenarios.map((scenario, index) => (
-                      <div
-                        key={index}
-                        className={`border rounded-lg ${
-                          scenario.status === 'failed' ? 'border-red-200' : 'border-green-200'
-                        }`}
-                      >
-                        <div
-                          className={`p-4 flex items-center justify-between ${
-                            scenario.status === 'failed' ? 'bg-red-50' : 'bg-green-50'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span className={scenario.status === 'failed' ? 'text-red-500' : 'text-green-500'}>
-                              {scenario.status === 'failed' ? '✗' : '✓'}
-                            </span>
-                            <h3 className="font-medium">{scenario.name}</h3>
-                          </div>
-                        </div>
-                        <div className="p-4 space-y-2">
-                          {scenario.steps.map((step, stepIndex) => (
-                            <div
-                              key={stepIndex}
-                              className={`p-2 rounded ${
-                                step.status === 'failed'
-                                  ? 'bg-red-50 border-l-4 border-red-500'
-                                  : step.status === 'passed'
-                                  ? 'bg-green-50 border-l-4 border-green-500'
-                                  : 'bg-gray-50 border-l-4 border-gray-500'
-                              }`}
-                            >
-                              <div className="flex items-center">
-                                <span
-                                  className={`mr-2 ${
-                                    step.status === 'failed'
-                                      ? 'text-red-500'
-                                      : step.status === 'passed'
-                                      ? 'text-green-500'
-                                      : 'text-gray-500'
-                                  }`}
-                                >
-                                  {step.status === 'passed' ? '✓' : step.status === 'failed' ? '✗' : '○'}
-                                </span>
-                                <span>{step.name}</span>
-                              </div>
-                              {step.errorMessage && (
-                                <pre className="mt-2 p-2 text-sm text-red-600 bg-red-50 rounded overflow-x-auto">
-                                  {step.errorMessage}
-                                </pre>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <TestResultView result={result} />
                 </div>
               )}
             </div>
