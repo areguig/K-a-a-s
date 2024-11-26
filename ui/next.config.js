@@ -3,6 +3,8 @@ const nextConfig = {
   reactStrictMode: false,
   swcMinify: true,
   output: 'export',
+  trailingSlash: true,
+  assetPrefix: '/',
   experimental: {
     optimizePackageImports: ['@monaco-editor/react']
   },
