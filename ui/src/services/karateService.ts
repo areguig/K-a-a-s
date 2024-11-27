@@ -26,40 +26,16 @@ export const executeFeature = async (
     const output = response.data.output;
     console.log('Output object:', output);
 
-    // Parse scenarios from the feature content
-    const scenarioMatches = output.featureContent.match(/Scenario:.*?(?=Scenario:|$)/gs) || [];
-    const scenariosList = scenarioMatches.map((scenarioContent: string) => {
-      const scenarioName = scenarioContent.match(/Scenario:\s*(.*)/)?.[1] || 'Unnamed Scenario';
-      const stepLines = scenarioContent.split('\n')
-        .filter((line: string) => /^\s*(Given|When|Then|And|But)\s+/.test(line))
-        .map((line: string) => line.trim());
-
-      const scenarioSteps = stepLines.map((stepLine: string) => {
-        const [, keyword, text] = stepLine.match(/^\s*(Given|When|Then|And|But)\s+(.+)/) || [];
-        const matchingStep = output.steps?.find((step: any) => 
-          step.text === text
-        );
-
-        return {
-          name: stepLine,
-          status: matchingStep?.status || 'passed',
-          errorMessage: matchingStep?.error
-        };
-      });
-
-      const hasFailedSteps = scenarioSteps.some(step => 
-        step.status === 'failed' || step.status === 'skipped'
-      );
-      
-      return {
-        name: scenarioName.trim(),
-        steps: scenarioSteps,
-        status: hasFailedSteps ? 'failed' : 'passed'
-      };
-    });
-
     const result: KarateResult = {
-      scenariosList,
+      scenariosList: output.scenarioResults.map((scenario: any) => ({
+        name: scenario.name,
+        steps: scenario.steps.map((step: any) => ({
+          name: step.name,
+          status: step.status,
+          errorMessage: step.errorMessage
+        })),
+        status: scenario.status
+      })),
       status: output.scenarios.failed > 0 ? 'failed' : 'passed',
       time: output.time,
       features: {
