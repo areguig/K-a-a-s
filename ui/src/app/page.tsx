@@ -1,19 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { type Monaco, type EditorProps } from '@monaco-editor/react';
 import { KarateVersions, KarateResult } from '../types/karate';
 import { Header } from '../components/Header';
+import { TabbedEditor } from '../components/TabbedEditor';
 import { ScenarioView } from '../components/ScenarioView';
 import { ResultsSummary } from '../components/ResultsSummary';
 import { highlightFailedSteps } from '../utils/monaco';
 import { executeFeature, fetchVersions } from '../services/karateService';
-
-const MonacoEditor = dynamic(
-  () => import('@monaco-editor/react'),
-  { ssr: false }
-);
 
 const DEFAULT_FEATURE = `Feature: Sample API Tests
 
@@ -58,7 +52,6 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [versions, setVersions] = useState<KarateVersions>({ karate: '', java: '' });
-  const [editorRef, setEditorRef] = useState<Parameters<NonNullable<EditorProps['onMount']>>[0] | null>(null);
   const [expandedScenarios, setExpandedScenarios] = useState<{ [key: string]: boolean }>({});
   const [expandedErrors, setExpandedErrors] = useState<{ [key: string]: boolean }>({});
 
@@ -116,48 +109,14 @@ export default function Home() {
       <main className="p-8">
         <div className="max-w-7xl mx-auto">
 
-        {/* Feature and Config boxes side by side */}
-        <div className="grid grid-cols-2 gap-8 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <h2 className="text-lg font-semibold mb-4">Feature File</h2>
-            <div className="h-[400px] border rounded">
-              <MonacoEditor
-                height="100%"
-                defaultLanguage="gherkin"
-                theme="vs-light"
-                value={featureContent}
-                onChange={(value) => setFeatureContent(value || '')}
-                onMount={(editor) => setEditorRef(editor)}
-                options={{
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  fontSize: 14,
-                  lineNumbers: 'on',
-                  wordWrap: 'on',
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <h2 className="text-lg font-semibold mb-4">Configuration</h2>
-            <div className="h-[400px] border rounded">
-              <MonacoEditor
-                height="100%"
-                defaultLanguage="json"
-                theme="vs-light"
-                value={configState}
-                onChange={(value) => setConfigState(value || '')}
-                options={{
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  fontSize: 14,
-                  lineNumbers: 'on',
-                  wordWrap: 'on',
-                }}
-              />
-            </div>
-          </div>
+        {/* Tabbed Editor */}
+        <div className="mb-8">
+          <TabbedEditor
+            featureContent={featureContent}
+            configContent={configState}
+            onFeatureChange={(value) => setFeatureContent(value)}
+            onConfigChange={(value) => setConfigState(value)}
+          />
         </div>
 
         {/* Test Results and Logs */}

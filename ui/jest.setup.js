@@ -60,6 +60,7 @@ jest.mock('@monaco-editor/react', () => {
   }
 })
 
+
 // Mock fetch
 global.fetch = jest.fn()
 
