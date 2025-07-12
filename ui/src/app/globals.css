@@ -218,4 +218,90 @@ body {
     background-color: #ef4444;
     margin-left: 3px;
   }
+
+  /* KaaS Design System - Typography Utilities */
+  .text-display-sm {
+    @apply text-display-sm font-display;
+  }
+
+  .text-display-md {
+    @apply text-display-md font-display;
+  }
+
+  .text-display-lg {
+    @apply text-display-lg font-display;
+  }
+
+  .text-heading-1 {
+    @apply text-3xl font-bold font-display;
+  }
+
+  .text-heading-2 {
+    @apply text-2xl font-semibold font-display;
+  }
+
+  .text-heading-3 {
+    @apply text-xl font-semibold font-display;
+  }
+
+  .text-heading-4 {
+    @apply text-lg font-medium font-display;
+  }
+
+  .text-body-lg {
+    @apply text-lg font-body;
+  }
+
+  .text-body {
+    @apply text-base font-body;
+  }
+
+  .text-body-sm {
+    @apply text-sm font-body;
+  }
+
+  .text-caption {
+    @apply text-xs font-body text-gray-600;
+  }
+
+  /* KaaS Design System - Component Utilities */
+  .card-elevated {
+    @apply bg-surface-primary rounded-2xl shadow-medium;
+  }
+
+  .card-outline {
+    @apply bg-surface-primary rounded-xl border border-gray-200;
+  }
+
+  .card-soft {
+    @apply bg-surface-secondary rounded-xl shadow-soft;
+  }
+
+  .btn-primary {
+    @apply bg-brand-primary text-white font-medium px-4 py-2 rounded-lg 
+           hover:bg-blue-700 transition-colors duration-200 
+           focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-primary text-brand-primary border border-brand-primary font-medium px-4 py-2 rounded-lg
+           hover:bg-blue-50 transition-colors duration-200
+           focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2;
+  }
+
+  .status-badge-success {
+    @apply bg-green-100 text-status-success px-2 py-1 rounded-md text-sm font-medium;
+  }
+
+  .status-badge-error {
+    @apply bg-red-100 text-status-error px-2 py-1 rounded-md text-sm font-medium;
+  }
+
+  .status-badge-warning {
+    @apply bg-yellow-100 text-status-warning px-2 py-1 rounded-md text-sm font-medium;
+  }
+
+  .status-badge-info {
+    @apply bg-blue-100 text-status-info px-2 py-1 rounded-md text-sm font-medium;
+  }
 }

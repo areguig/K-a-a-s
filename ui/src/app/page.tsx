@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { type Monaco, type EditorProps } from '@monaco-editor/react';
 import { KarateVersions, KarateResult } from '../types/karate';
+import { Header } from '../components/Header';
 import { ScenarioView } from '../components/ScenarioView';
 import { ResultsSummary } from '../components/ResultsSummary';
 import { highlightFailedSteps } from '../utils/monaco';
@@ -105,22 +106,15 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Karate as a Service</h1>
-          <button
-            onClick={handleRunTests}
-            disabled={isRunning}
-            className={`px-4 py-2 rounded-lg text-white font-medium ${
-              isRunning
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            {isRunning ? 'Running...' : 'Run Tests'}
-          </button>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      <Header 
+        versions={versions}
+        isRunning={isRunning}
+        lastExecutionTime={result?.time}
+        onRunTests={handleRunTests}
+      />
+      <main className="p-8">
+        <div className="max-w-7xl mx-auto">
 
         {/* Feature and Config boxes side by side */}
         <div className="grid grid-cols-2 gap-8 mb-8">
@@ -246,7 +240,8 @@ export default function Home() {
             </div>
           )}
         </div>
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }

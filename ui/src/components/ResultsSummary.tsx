@@ -6,22 +6,22 @@ interface ResultsSummaryProps {
 
 export const ResultsSummary: React.FC<ResultsSummaryProps> = ({ result }) => {
   return (
-    <div className="summary bg-white rounded-lg shadow-sm p-4 mb-4">
-      <h3 className="text-lg font-semibold">Test Results</h3>
+    <div className="summary card-soft p-4 mb-4">
+      <h3 className="text-heading-4">Test Results</h3>
       <div className="grid grid-cols-3 gap-4 mt-4">
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-          <div className="text-green-800 font-medium">Passed</div>
-          <div className="text-2xl font-bold text-green-900">
+        <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+          <div className="text-status-success font-medium">Passed</div>
+          <div className="text-2xl font-bold text-status-success">
             {result.scenarios.passed}
           </div>
         </div>
-        <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-          <div className="text-red-800 font-medium">Failed</div>
-          <div className="text-2xl font-bold text-red-900">
+        <div className="bg-red-50 p-4 rounded-xl border border-red-200">
+          <div className="text-status-error font-medium">Failed</div>
+          <div className="text-2xl font-bold text-status-error">
             {result.scenarios.failed}
           </div>
         </div>
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div className="bg-surface-secondary p-4 rounded-xl border border-gray-200">
           <div className="text-gray-800 font-medium">Total</div>
           <div className="text-2xl font-bold text-gray-900">
             {result.scenarios.total}
