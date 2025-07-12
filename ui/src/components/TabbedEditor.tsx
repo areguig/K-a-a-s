@@ -114,7 +114,7 @@ export const TabbedEditor: React.FC<TabbedEditorProps> = ({
             lineNumbers: 'on',
             wordWrap: 'on',
             folding: true,
-            bracketMatching: 'always',
+            matchBrackets: 'always',
             automaticLayout: true,
             padding: { top: 16, bottom: 16 },
             suggestOnTriggerCharacters: true,

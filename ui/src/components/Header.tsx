@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Zap, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { Activity, Zap, CheckCircle, AlertCircle, Clock, History } from 'lucide-react';
 import { KarateVersions } from '../types/karate';
 
 interface HeaderProps {
@@ -7,6 +7,7 @@ interface HeaderProps {
   isRunning?: boolean;
   lastExecutionTime?: number;
   onRunTests: () => void;
+  onShowHistory?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,6 +15,7 @@ export const Header: React.FC<HeaderProps> = ({
   isRunning = false,
   lastExecutionTime,
   onRunTests,
+  onShowHistory,
 }) => {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
@@ -105,30 +107,44 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Run Tests Button */}
-            <button
-              onClick={onRunTests}
-              disabled={isRunning || connectionStatus === 'disconnected'}
-              className={`px-6 py-2 rounded-xl font-medium transition-all duration-200 ${
-                isRunning
-                  ? 'bg-status-warning text-yellow-900 cursor-not-allowed'
-                  : connectionStatus === 'disconnected'
-                  ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
-                  : 'bg-surface-primary text-brand-primary hover:bg-blue-50 hover:shadow-medium transform hover:-translate-y-0.5'
-              }`}
-            >
-              {isRunning ? (
-                <div className="flex items-center space-x-2">
-                  <Activity className="w-4 h-4 animate-spin" />
-                  <span>Running Tests...</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4" />
-                  <span>Run Tests</span>
-                </div>
+            {/* Action Buttons */}
+            <div className="flex items-center space-x-3">
+              {/* History Button */}
+              {onShowHistory && (
+                <button
+                  onClick={onShowHistory}
+                  className="p-2 rounded-lg text-white hover:bg-white/10 transition-all duration-200 hover:shadow-medium transform hover:-translate-y-0.5"
+                  title="View execution history"
+                >
+                  <History className="w-5 h-5" />
+                </button>
               )}
-            </button>
+
+              {/* Run Tests Button */}
+              <button
+                onClick={onRunTests}
+                disabled={isRunning || connectionStatus === 'disconnected'}
+                className={`px-6 py-2 rounded-xl font-medium transition-all duration-200 ${
+                  isRunning
+                    ? 'bg-status-warning text-yellow-900 cursor-not-allowed'
+                    : connectionStatus === 'disconnected'
+                    ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                    : 'bg-surface-primary text-brand-primary hover:bg-blue-50 hover:shadow-medium transform hover:-translate-y-0.5'
+                }`}
+              >
+                {isRunning ? (
+                  <div className="flex items-center space-x-2">
+                    <Activity className="w-4 h-4 animate-spin" />
+                    <span>Running Tests...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Zap className="w-4 h-4" />
+                    <span>Run Tests</span>
+                  </div>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

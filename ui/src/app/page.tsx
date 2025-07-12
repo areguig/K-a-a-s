@@ -6,6 +6,9 @@ import { Header } from '../components/Header';
 import { TabbedEditor } from '../components/TabbedEditor';
 import { ScenarioView } from '../components/ScenarioView';
 import { ResultsSummary } from '../components/ResultsSummary';
+import { HistoryPanel } from '../components/HistoryPanel';
+import { useExecutionHistory } from '../hooks/useExecutionHistory';
+import { ExecutionHistory } from '../types/history';
 import { highlightFailedSteps } from '../utils/monaco';
 import { executeFeature, fetchVersions } from '../services/karateService';
 
@@ -54,6 +57,9 @@ export default function Home() {
   const [versions, setVersions] = useState<KarateVersions>({ karate: '', java: '' });
   const [expandedScenarios, setExpandedScenarios] = useState<{ [key: string]: boolean }>({});
   const [expandedErrors, setExpandedErrors] = useState<{ [key: string]: boolean }>({});
+  const [showHistory, setShowHistory] = useState(false);
+  
+  const { saveExecution } = useExecutionHistory();
 
   useEffect(() => {
     const loadVersions = async () => {
@@ -75,6 +81,9 @@ export default function Home() {
       const karateResult = await executeFeature(featureContent, configState);
       setResult(karateResult);
       setLogs(karateResult.logs || []);
+      
+      // Save execution to history
+      saveExecution(featureContent, configState, karateResult);
     } catch (err) {
       console.error('Error executing feature:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -98,6 +107,37 @@ export default function Home() {
     }));
   };
 
+  const handleLoadHistory = (execution: ExecutionHistory) => {
+    // Check if there are unsaved changes
+    const hasUnsavedChanges = 
+      featureContent !== DEFAULT_FEATURE || 
+      configState !== JSON.stringify({
+        logLevel: 'debug',
+        retryCount: 0,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      }, null, 2);
+
+    if (hasUnsavedChanges) {
+      const confirmLoad = window.confirm(
+        'You have unsaved changes in the editor. Loading from history will replace your current work. Continue?'
+      );
+      if (!confirmLoad) return;
+    }
+
+    // Load the execution from history
+    setFeatureContent(execution.featureContent);
+    setConfigState(execution.configContent);
+    setShowHistory(false);
+    
+    // Clear current results
+    setResult(null);
+    setError(null);
+    setLogs([]);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header 
@@ -105,6 +145,7 @@ export default function Home() {
         isRunning={isRunning}
         lastExecutionTime={result?.time}
         onRunTests={handleRunTests}
+        onShowHistory={() => setShowHistory(true)}
       />
       <main className="p-8">
         <div className="max-w-7xl mx-auto">
@@ -201,6 +242,13 @@ export default function Home() {
         </div>
         </div>
       </main>
+
+      {/* Execution History Panel */}
+      <HistoryPanel
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        onLoadHistory={handleLoadHistory}
+      />
     </div>
   );
 }
