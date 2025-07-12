@@ -7,6 +7,7 @@ import { TabbedEditor } from '../components/TabbedEditor';
 import { ScenarioView } from '../components/ScenarioView';
 import { ResultsSummary } from '../components/ResultsSummary';
 import { HistoryPanel } from '../components/HistoryPanel';
+import { EditorResultsPanel } from '../components/ResizablePanel';
 import { useExecutionHistory } from '../hooks/useExecutionHistory';
 import { ExecutionHistory } from '../types/history';
 import { highlightFailedSteps } from '../utils/monaco';
@@ -148,98 +149,100 @@ export default function Home() {
         onShowHistory={() => setShowHistory(true)}
       />
       <main className="p-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto h-[calc(100vh-120px)]">
+          <EditorResultsPanel
+            editorContent={
+              <div className="h-full">
+                <TabbedEditor
+                  featureContent={featureContent}
+                  configContent={configState}
+                  onFeatureChange={(value) => setFeatureContent(value)}
+                  onConfigChange={(value) => setConfigState(value)}
+                />
+              </div>
+            }
+            resultsContent={
+              <div className="h-full overflow-y-auto space-y-8 p-4">
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h3 className="text-red-800 font-medium">Error</h3>
+                    <p className="text-red-600 mt-1">{error}</p>
+                  </div>
+                )}
 
-        {/* Tabbed Editor */}
-        <div className="mb-8">
-          <TabbedEditor
-            featureContent={featureContent}
-            configContent={configState}
-            onFeatureChange={(value) => setFeatureContent(value)}
-            onConfigChange={(value) => setConfigState(value)}
+                {result && (
+                  <>
+                    {/* Test Results Summary */}
+                    <div className="bg-white rounded-lg shadow-sm p-4">
+                      <ResultsSummary result={result} />
+                    </div>
+
+                    {/* Detailed Test Results */}
+                    <div className="bg-white rounded-lg shadow-sm p-4">
+                      <h2 className="text-lg font-semibold mb-4">Test Results</h2>
+                      <div className="space-y-4">
+                        {result.scenariosList.map((scenario, index) => (
+                          <div key={index} className="border rounded-lg p-4">
+                            <h3 className="font-medium mb-2">{scenario.name}</h3>
+                            <ScenarioView
+                              key={`scenario-${index}`}
+                              scenario={scenario}
+                              expanded={expandedScenarios[scenario.name] || false}
+                              onToggle={() => toggleScenario(scenario.name)}
+                              onToggleError={toggleError}
+                              expandedErrors={expandedErrors}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Logs Section */}
+                    {logs && logs.length > 0 && (
+                      <div className="bg-white rounded-lg shadow-sm p-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <h2 className="text-lg font-semibold">Execution Logs</h2>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => navigator.clipboard.writeText(logs.join('\n'))}
+                              className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
+                            >
+                              Copy Logs
+                            </button>
+                            <button
+                              onClick={() => {
+                                const blob = new Blob([logs.join('\n')], { type: 'text/plain' });
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'karate-execution-logs.txt';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                window.URL.revokeObjectURL(url);
+                              }}
+                              className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
+                            >
+                              Download Logs
+                            </button>
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded font-mono text-sm whitespace-pre-wrap max-h-[300px] overflow-auto">
+                          {logs.join('\n')}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {versions.karate && (
+                  <div className="text-sm text-gray-600">
+                    Using Karate {versions.karate} with Java {versions.java}
+                  </div>
+                )}
+              </div>
+            }
           />
-        </div>
-
-        {/* Test Results and Logs */}
-        <div className="space-y-8">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h3 className="text-red-800 font-medium">Error</h3>
-              <p className="text-red-600 mt-1">{error}</p>
-            </div>
-          )}
-
-          {result && (
-            <>
-              {/* Test Results Summary */}
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <ResultsSummary result={result} />
-              </div>
-
-              {/* Detailed Test Results */}
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <h2 className="text-lg font-semibold mb-4">Test Results</h2>
-                <div className="space-y-4">
-                  {result.scenariosList.map((scenario, index) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <h3 className="font-medium mb-2">{scenario.name}</h3>
-                      <ScenarioView
-                        key={`scenario-${index}`}
-                        scenario={scenario}
-                        expanded={expandedScenarios[scenario.name] || false}
-                        onToggle={() => toggleScenario(scenario.name)}
-                        onToggleError={toggleError}
-                        expandedErrors={expandedErrors}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Logs Section */}
-              {logs && logs.length > 0 && (
-                <div className="bg-white rounded-lg shadow-sm p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold">Execution Logs</h2>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => navigator.clipboard.writeText(logs.join('\n'))}
-                        className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
-                      >
-                        Copy Logs
-                      </button>
-                      <button
-                        onClick={() => {
-                          const blob = new Blob([logs.join('\n')], { type: 'text/plain' });
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = 'karate-execution-logs.txt';
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          window.URL.revokeObjectURL(url);
-                        }}
-                        className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
-                      >
-                        Download Logs
-                      </button>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded font-mono text-sm whitespace-pre-wrap max-h-[300px] overflow-auto">
-                    {logs.join('\n')}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {versions.karate && (
-            <div className="text-sm text-gray-600">
-              Using Karate {versions.karate} with Java {versions.java}
-            </div>
-          )}
-        </div>
         </div>
       </main>
 
