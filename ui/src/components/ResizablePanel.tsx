@@ -78,9 +78,9 @@ export const EditorResultsPanel: React.FC<EditorResultsPanelProps> = ({
 }) => {
   return (
     <ResizablePanel
-      direction="vertical"
-      defaultSizes={[40, 60]}
-      minSizes={[25, 25]}
+      direction="horizontal"
+      defaultSizes={[70, 30]}
+      minSizes={[40, 20]}
       className={className}
       storageKey="editor-results-panels"
     >

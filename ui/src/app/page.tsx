@@ -8,6 +8,8 @@ import { ScenarioView } from '../components/ScenarioView';
 import { ResultsSummary } from '../components/ResultsSummary';
 import { HistoryPanel } from '../components/HistoryPanel';
 import { EditorResultsPanel } from '../components/ResizablePanel';
+import { ActivityBar } from '../components/ActivityBar';
+import { EditorToolbar } from '../components/EditorToolbar';
 import { FileExplorer } from '../components/FileExplorer';
 import { FileTabs } from '../components/FileTabs';
 import { useWorkspace, useActiveFile } from '../contexts/WorkspaceContext';
@@ -182,31 +184,48 @@ export default function Home() {
         versions={versions}
         isRunning={isRunning}
         lastExecutionTime={result?.time}
-        onRunTests={handleRunTests}
         onShowHistory={() => setShowHistory(true)}
-        activeFileName={activeFile?.name}
-        onDownloadFile={handleDownloadFile}
-        onDownloadWorkspace={handleDownloadWorkspace}
-        onToggleFileExplorer={() => setShowFileExplorer(!showFileExplorer)}
-        onSaveWorkspace={handleSaveWorkspace}
-        hasUnsavedChanges={hasUnsavedChanges}
       />
-      <main className="p-8">
-        <div className="max-w-7xl mx-auto h-[calc(100vh-120px)]">
-          <div className="flex h-full gap-4">
-            {/* File Explorer Sidebar */}
-            {showFileExplorer && (
-              <div className="w-64 flex-shrink-0">
+      <main className="h-[calc(100vh-120px)] flex">
+        {/* Activity Bar */}
+        <ActivityBar 
+          showFileExplorer={showFileExplorer}
+          onToggleFileExplorer={() => setShowFileExplorer(!showFileExplorer)}
+        />
+        
+        {/* File Explorer Sidebar */}
+        <div className={`bg-gray-50 border-r border-gray-200 transition-all duration-300 ease-in-out ${
+          showFileExplorer ? 'w-80' : 'w-0'
+        } overflow-hidden`}>
+          {showFileExplorer && (
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-100">
+                <h3 className="font-medium text-gray-700 text-sm uppercase tracking-wide">Explorer</h3>
+              </div>
+              <div className="flex-1 overflow-hidden">
                 <FileExplorer className="h-full" />
               </div>
-            )}
-            
-            {/* Main Content */}
-            <div className="flex-1 min-w-0">
-              <EditorResultsPanel
+            </div>
+          )}
+        </div>
+        
+        {/* Main Content Area */}
+        <div className="flex-1 min-w-0 h-full">
+          <EditorResultsPanel
                 editorContent={
                   <div className="h-full flex flex-col">
                     <FileTabs className="flex-shrink-0" />
+                    <EditorToolbar
+                      activeFileName={activeFile?.name}
+                      hasUnsavedChanges={hasUnsavedChanges}
+                      isRunning={isRunning}
+                      isApiConnected={versions?.karate ? true : false}
+                      onRunTests={handleRunTests}
+                      onSaveWorkspace={handleSaveWorkspace}
+                      onDownloadFile={handleDownloadFile}
+                      onDownloadWorkspace={handleDownloadWorkspace}
+                      onShowHistory={() => setShowHistory(true)}
+                    />
                     <div className="flex-1 min-h-0">
                       {activeFile ? (
                         <TabbedEditor
@@ -217,7 +236,21 @@ export default function Home() {
                         />
                       ) : (
                         <div className="h-full flex items-center justify-center text-gray-500">
-                          <p>No file selected</p>
+                          <div className="text-center">
+                            <p className="text-lg mb-2">No file selected</p>
+                            <p className="text-sm">
+                              {!showFileExplorer ? (
+                                <button 
+                                  onClick={() => setShowFileExplorer(true)}
+                                  className="text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  Open file explorer
+                                </button>
+                              ) : (
+                                "Select a file from the explorer to start editing"
+                              )}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -305,8 +338,6 @@ export default function Home() {
               </div>
             }
           />
-            </div>
-          </div>
         </div>
       </main>
 
