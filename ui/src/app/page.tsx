@@ -174,7 +174,7 @@ export default function Home() {
                   <>
                     {/* Test Results Summary */}
                     <div className="bg-white rounded-lg shadow-sm p-4">
-                      <ResultsSummary result={result} />
+                      <ResultsSummary result={result} isRunning={isRunning} />
                     </div>
 
                     {/* Detailed Test Results */}

@@ -33,7 +33,7 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
       onLayout={handleResize}
     >
       {children.map((child, index) => (
-        <React.Fragment key={index}>
+        <React.Fragment key={`panel-${index}`}>
           <Panel
             defaultSize={sizes[index]}
             minSize={minSizes[index] || 10}
@@ -44,7 +44,7 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
           
           {/* Add resize handle between panels, but not after the last one */}
           {index < children.length - 1 && (
-            <PanelResizeHandle className="panel-resize-handle">
+            <PanelResizeHandle key={`handle-${index}`} className="panel-resize-handle">
               <div className="panel-resize-handle-inner">
                 <GripVertical className="panel-resize-handle-icon" />
               </div>
@@ -76,7 +76,10 @@ export const EditorResultsPanel: React.FC<EditorResultsPanelProps> = ({
       className={className}
       storageKey="editor-results-panels"
     >
-      {[editorContent, resultsContent]}
+      {[
+        <React.Fragment key="editor">{editorContent}</React.Fragment>,
+        <React.Fragment key="results">{resultsContent}</React.Fragment>
+      ]}
     </ResizablePanel>
   );
 };
