@@ -8,10 +8,14 @@ import { ScenarioView } from '../components/ScenarioView';
 import { ResultsSummary } from '../components/ResultsSummary';
 import { HistoryPanel } from '../components/HistoryPanel';
 import { EditorResultsPanel } from '../components/ResizablePanel';
+import { FileExplorer } from '../components/FileExplorer';
+import { FileTabs } from '../components/FileTabs';
+import { useWorkspace, useActiveFile } from '../contexts/WorkspaceContext';
 import { useExecutionHistory } from '../hooks/useExecutionHistory';
 import { ExecutionHistory } from '../types/history';
 import { highlightFailedSteps } from '../utils/monaco';
 import { executeFeature, fetchVersions } from '../services/karateService';
+import { downloadFile, downloadWorkspace } from '../utils/fileDownload';
 
 const DEFAULT_FEATURE = `Feature: Sample API Tests
 
@@ -42,15 +46,8 @@ Scenario: Intentionally failing test
   And match response == { wrongField: '#present' }`;
 
 export default function Home() {
-  const [featureContent, setFeatureContent] = useState<string>(DEFAULT_FEATURE);
-  const [configState, setConfigState] = useState(JSON.stringify({
-    logLevel: 'debug',
-    retryCount: 0,
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    }
-  }, null, 2));
+  const { workspace, updateFileContent, isLoading, saveWorkspace, hasUnsavedChanges } = useWorkspace();
+  const activeFile = useActiveFile();
   const [result, setResult] = useState<KarateResult | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -59,6 +56,7 @@ export default function Home() {
   const [expandedScenarios, setExpandedScenarios] = useState<{ [key: string]: boolean }>({});
   const [expandedErrors, setExpandedErrors] = useState<{ [key: string]: boolean }>({});
   const [showHistory, setShowHistory] = useState(false);
+  const [showFileExplorer, setShowFileExplorer] = useState(true);
   
   const { saveExecution } = useExecutionHistory();
 
@@ -75,16 +73,21 @@ export default function Home() {
   }, []);
 
   const handleRunTests = async () => {
+    if (!activeFile) {
+      setError('No active file to run');
+      return;
+    }
+
     setIsRunning(true);
     setError(null);
     setLogs([]);
     try {
-      const karateResult = await executeFeature(featureContent, configState);
+      const karateResult = await executeFeature(activeFile.featureContent, activeFile.configContent);
       setResult(karateResult);
       setLogs(karateResult.logs || []);
       
       // Save execution to history
-      saveExecution(featureContent, configState, karateResult);
+      saveExecution(activeFile.featureContent, activeFile.configContent, karateResult);
     } catch (err) {
       console.error('Error executing feature:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -109,28 +112,20 @@ export default function Home() {
   };
 
   const handleLoadHistory = (execution: ExecutionHistory) => {
+    if (!activeFile) return;
+
     // Check if there are unsaved changes
-    const hasUnsavedChanges = 
-      featureContent !== DEFAULT_FEATURE || 
-      configState !== JSON.stringify({
-        logLevel: 'debug',
-        retryCount: 0,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      }, null, 2);
+    const hasUnsavedChanges = activeFile.isUnsaved;
 
     if (hasUnsavedChanges) {
       const confirmLoad = window.confirm(
-        'You have unsaved changes in the editor. Loading from history will replace your current work. Continue?'
+        'You have unsaved changes in the current file. Loading from history will replace your current work. Continue?'
       );
       if (!confirmLoad) return;
     }
 
-    // Load the execution from history
-    setFeatureContent(execution.featureContent);
-    setConfigState(execution.configContent);
+    // Load the execution from history into current file
+    updateFileContent(activeFile.id, execution.featureContent, execution.configContent);
     setShowHistory(false);
     
     // Clear current results
@@ -138,6 +133,48 @@ export default function Home() {
     setError(null);
     setLogs([]);
   };
+
+  const handleDownloadFile = () => {
+    if (activeFile) {
+      try {
+        downloadFile(activeFile);
+      } catch (error) {
+        console.error('Failed to download file:', error);
+        setError('Failed to download file');
+      }
+    }
+  };
+
+  const handleDownloadWorkspace = () => {
+    if (workspace) {
+      try {
+        downloadWorkspace(workspace);
+      } catch (error) {
+        console.error('Failed to download workspace:', error);
+        setError('Failed to download workspace');
+      }
+    }
+  };
+
+  const handleSaveWorkspace = async () => {
+    try {
+      await saveWorkspace();
+    } catch (error) {
+      console.error('Failed to save workspace:', error);
+      setError('Failed to save workspace');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -147,20 +184,45 @@ export default function Home() {
         lastExecutionTime={result?.time}
         onRunTests={handleRunTests}
         onShowHistory={() => setShowHistory(true)}
+        activeFileName={activeFile?.name}
+        onDownloadFile={handleDownloadFile}
+        onDownloadWorkspace={handleDownloadWorkspace}
+        onToggleFileExplorer={() => setShowFileExplorer(!showFileExplorer)}
+        onSaveWorkspace={handleSaveWorkspace}
+        hasUnsavedChanges={hasUnsavedChanges}
       />
       <main className="p-8">
         <div className="max-w-7xl mx-auto h-[calc(100vh-120px)]">
-          <EditorResultsPanel
-            editorContent={
-              <div className="h-full">
-                <TabbedEditor
-                  featureContent={featureContent}
-                  configContent={configState}
-                  onFeatureChange={(value) => setFeatureContent(value)}
-                  onConfigChange={(value) => setConfigState(value)}
-                />
+          <div className="flex h-full gap-4">
+            {/* File Explorer Sidebar */}
+            {showFileExplorer && (
+              <div className="w-64 flex-shrink-0">
+                <FileExplorer className="h-full" />
               </div>
-            }
+            )}
+            
+            {/* Main Content */}
+            <div className="flex-1 min-w-0">
+              <EditorResultsPanel
+                editorContent={
+                  <div className="h-full flex flex-col">
+                    <FileTabs className="flex-shrink-0" />
+                    <div className="flex-1 min-h-0">
+                      {activeFile ? (
+                        <TabbedEditor
+                          featureContent={activeFile.featureContent}
+                          configContent={activeFile.configContent}
+                          onFeatureChange={(value) => updateFileContent(activeFile.id, value, undefined)}
+                          onConfigChange={(value) => updateFileContent(activeFile.id, undefined, value)}
+                        />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-gray-500">
+                          <p>No file selected</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                }
             resultsContent={
               <div className="h-full overflow-y-auto space-y-8 p-4">
                 {error && (
@@ -243,6 +305,8 @@ export default function Home() {
               </div>
             }
           />
+            </div>
+          </div>
         </div>
       </main>
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { GripVertical } from 'lucide-react';
 import { usePanelSizes } from '../hooks/useLocalStorage';
@@ -21,6 +21,14 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
   storageKey = 'default-panels'
 }) => {
   const [sizes, setSizes] = usePanelSizes(defaultSizes);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Prevent hydration mismatch by using default sizes until hydrated
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  const currentSizes = isHydrated ? sizes : defaultSizes;
 
   const handleResize = (newSizes: number[]) => {
     setSizes(newSizes);
@@ -35,7 +43,7 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
       {children.map((child, index) => (
         <React.Fragment key={`panel-${index}`}>
           <Panel
-            defaultSize={sizes[index]}
+            defaultSize={currentSizes[index]}
             minSize={minSizes[index] || 10}
             className="panel-content"
           >
