@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, AlertCircle, Clock, History, Activity, Zap } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, History, Activity, Zap, BookOpen, Code, GitBranch } from 'lucide-react';
 import { KarateVersions } from '../types/karate';
+import config from '../app/config';
 
 interface HeaderProps {
-  versions?: KarateVersions;
-  isRunning?: boolean;
+  versions?: KarateVersions | null;
   lastExecutionTime?: number;
   onShowHistory?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   versions,
-  isRunning = false,
   lastExecutionTime,
   onShowHistory,
 }) => {
@@ -19,7 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   useEffect(() => {
     // Simulate API connection check based on versions availability
-    if (versions?.karate && versions?.java) {
+    if (versions?.version?.karateVersion && versions?.version?.javaVersion) {
       setConnectionStatus('connected');
     } else {
       setConnectionStatus('disconnected');
@@ -81,16 +80,24 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="text-sm font-medium">{getStatusText()}</span>
             </div>
 
-            {/* Version Info */}
-            {versions?.karate && (
-              <div className="text-white text-sm">
-                <div className="flex items-center space-x-1">
-                  <span className="text-blue-200">Karate:</span>
-                  <span className="font-mono font-medium">{versions.karate}</span>
+            {/* System Info */}
+            {versions?.version?.karateVersion && (
+              <div className="text-white text-sm space-y-1">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-blue-200">Karate:</span>
+                    <span className="font-mono font-medium">{versions.version.karateVersion}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-blue-200">Java:</span>
+                    <span className="font-mono font-medium">{versions.version.javaVersion}</span>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <span className="text-blue-200">Java:</span>
-                  <span className="font-mono font-medium">{versions.java}</span>
+                <div className="flex items-center space-x-4 text-xs">
+                  <div className="flex items-center space-x-1">
+                    <GitBranch className="w-3 h-3 text-blue-300" />
+                    <span className="text-blue-200">{versions.version.gitBranch}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -107,6 +114,28 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Action Buttons */}
             <div className="flex items-center space-x-3">
+              {/* Documentation Links */}
+              <div className="flex items-center space-x-2">
+                <a
+                  href="https://karatelabs.github.io/karate/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg text-white hover:bg-white/10 transition-all duration-200 hover:shadow-medium transform hover:-translate-y-0.5"
+                  title="Karate Documentation"
+                >
+                  <BookOpen className="w-5 h-5" />
+                </a>
+                <a
+                  href={`${config.apiUrl}/swagger-ui/index.html`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg text-white hover:bg-white/10 transition-all duration-200 hover:shadow-medium transform hover:-translate-y-0.5"
+                  title="API Documentation"
+                >
+                  <Code className="w-5 h-5" />
+                </a>
+              </div>
+
               {/* History Button */}
               {onShowHistory && (
                 <button

@@ -4,18 +4,18 @@ import { KarateVersions, KarateResult } from '../types/karate';
 
 export const fetchVersions = async (): Promise<KarateVersions> => {
   try {
-    console.log('Fetching versions from:', `${config.apiUrl}/karate/versions`);
-    const response = await fetch(`${config.apiUrl}/karate/versions`);
+    console.log('Fetching info from:', `${config.apiUrl}/karate/info`);
+    const response = await fetch(`${config.apiUrl}/karate/info`);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('Versions response:', data);
+    console.log('Info response:', data);
     return data;
   } catch (error) {
-    console.error('Error fetching versions:', error);
+    console.error('Error fetching info:', error);
     throw error;
   }
 };

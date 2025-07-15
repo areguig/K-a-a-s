@@ -54,7 +54,7 @@ export default function Home() {
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [versions, setVersions] = useState<KarateVersions>({ karate: '', java: '' });
+  const [versions, setVersions] = useState<KarateVersions | null>(null);
   const [expandedScenarios, setExpandedScenarios] = useState<{ [key: string]: boolean }>({});
   const [expandedErrors, setExpandedErrors] = useState<{ [key: string]: boolean }>({});
   const [showHistory, setShowHistory] = useState(false);
@@ -182,7 +182,6 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       <Header 
         versions={versions}
-        isRunning={isRunning}
         lastExecutionTime={result?.time}
         onShowHistory={() => setShowHistory(true)}
       />
@@ -219,7 +218,7 @@ export default function Home() {
                       activeFileName={activeFile?.name}
                       hasUnsavedChanges={hasUnsavedChanges}
                       isRunning={isRunning}
-                      isApiConnected={versions?.karate ? true : false}
+                      isApiConnected={versions?.version?.karateVersion ? true : false}
                       onRunTests={handleRunTests}
                       onSaveWorkspace={handleSaveWorkspace}
                       onDownloadFile={handleDownloadFile}
@@ -330,9 +329,9 @@ export default function Home() {
                   </>
                 )}
 
-                {versions.karate && (
+                {versions?.version?.karateVersion && (
                   <div className="text-sm text-gray-600">
-                    Using Karate {versions.karate} with Java {versions.java}
+                    Using Karate {versions.version.karateVersion} with Java {versions.version.javaVersion}
                   </div>
                 )}
               </div>

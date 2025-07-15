@@ -1,6 +1,23 @@
 export interface KarateVersions {
-  karate: string;
-  java: string;
+  name: string;
+  description: string;
+  version: {
+    version: string;
+    gitCommit: string;
+    gitBranch: string;
+    buildTime: string;
+    karateVersion: string;
+    javaVersion: string;
+    gitDirty: boolean;
+    springBootVersion: string;
+    fullVersion: string;
+  };
+  resources: {
+    trackedFiles: number;
+    tempDirectory: string;
+    activeExecutions: number;
+  };
+  timestamp: number;
 }
 
 export interface KarateStep {

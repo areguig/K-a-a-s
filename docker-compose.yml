@@ -11,7 +11,7 @@ services:
       - QUARKUS_HTTP_PORT=3001
       - JAVA_OPTS=--enable-preview -XX:+UnlockExperimentalVMOptions -XX:+EnableVectorSupport -XX:+UseZGC -XX:+ZGenerational -Xms64m -Xmx256m -XX:MaxRAMPercentage=80.0 -XX:MinRAMPercentage=50.0 -Dfile.encoding=UTF-8 -Djava.awt.headless=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/karate/versions"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/karate/info"]
       interval: 30s
       timeout: 10s
       retries: 3
