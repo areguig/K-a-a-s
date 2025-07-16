@@ -12,6 +12,7 @@ import { ActivityBar } from '../components/ActivityBar';
 import { EditorToolbar } from '../components/EditorToolbar';
 import { FileExplorer } from '../components/FileExplorer';
 import { FileTabs } from '../components/FileTabs';
+import { FeatureGeneratorModal } from '../components/FeatureGeneratorModal';
 import { useWorkspace, useActiveFile } from '../contexts/WorkspaceContext';
 import { useExecutionHistory } from '../hooks/useExecutionHistory';
 import { ExecutionHistory } from '../types/history';
@@ -48,7 +49,7 @@ Scenario: Intentionally failing test
   And match response == { wrongField: '#present' }`;
 
 export default function Home() {
-  const { workspace, updateFileContent, isLoading, saveWorkspace, hasUnsavedChanges } = useWorkspace();
+  const { workspace, updateFileContent, isLoading, saveWorkspace, hasUnsavedChanges, createFile, setActiveFile } = useWorkspace();
   const activeFile = useActiveFile();
   const [result, setResult] = useState<KarateResult | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
@@ -59,6 +60,7 @@ export default function Home() {
   const [expandedErrors, setExpandedErrors] = useState<{ [key: string]: boolean }>({});
   const [showHistory, setShowHistory] = useState(false);
   const [showFileExplorer, setShowFileExplorer] = useState(true);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
   
   const { saveExecution } = useExecutionHistory();
 
@@ -167,6 +169,44 @@ export default function Home() {
     }
   };
 
+  const cleanGeneratedContent = (content: string): string => {
+    // Remove markdown code blocks if present
+    let cleanedContent = content.trim();
+    
+    // Remove ```gherkin from the beginning
+    if (cleanedContent.startsWith('```gherkin')) {
+      cleanedContent = cleanedContent.substring(10);
+    }
+    
+    // Remove ``` from the end
+    if (cleanedContent.endsWith('```')) {
+      cleanedContent = cleanedContent.substring(0, cleanedContent.length - 3);
+    }
+    
+    return cleanedContent.trim();
+  };
+
+  const handleGenerateFeature = (generatedContent: string) => {
+    // Clean the generated content to remove markdown code blocks
+    const cleanedContent = cleanGeneratedContent(generatedContent);
+    
+    // Create a new file with the cleaned content
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `generated-${timestamp}.feature`;
+    
+    try {
+      const newFile = createFile(fileName, cleanedContent, '{}');
+      // Auto-select the newly created file
+      if (newFile) {
+        setActiveFile(newFile.id);
+      }
+      setError(null);
+    } catch (error) {
+      console.error('Failed to create generated file:', error);
+      setError('Failed to create generated file');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -224,6 +264,7 @@ export default function Home() {
                       onDownloadFile={handleDownloadFile}
                       onDownloadWorkspace={handleDownloadWorkspace}
                       onShowHistory={() => setShowHistory(true)}
+                      onGenerateFeature={() => setShowGenerateModal(true)}
                     />
                     <div className="flex-1 min-h-0">
                       {activeFile ? (
@@ -345,6 +386,13 @@ export default function Home() {
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}
         onLoadHistory={handleLoadHistory}
+      />
+
+      {/* Feature Generator Modal */}
+      <FeatureGeneratorModal
+        isOpen={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        onGenerate={handleGenerateFeature}
       />
     </div>
   );

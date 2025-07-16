@@ -1,6 +1,6 @@
 import axios from 'axios';
 import config from '../app/config';
-import { KarateVersions, KarateResult } from '../types/karate';
+import { KarateVersions, KarateResult, GenerateRequest } from '../types/karate';
 
 export const fetchVersions = async (): Promise<KarateVersions> => {
   try {
@@ -67,6 +67,23 @@ export const executeFeature = async (
     return result;
   } catch (error) {
     console.error('Error in executeFeature:', error);
+    throw error;
+  }
+};
+
+export const generateFeature = async (
+  request: GenerateRequest
+): Promise<string> => {
+  try {
+    const response = await axios.post(`${config.apiUrl}/karate/generate`, request);
+    
+    if (!response.data || typeof response.data !== 'string') {
+      throw new Error('Invalid response format from generate API');
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error generating feature:', error);
     throw error;
   }
 };

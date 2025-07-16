@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Save, Download, FolderOpen, History } from 'lucide-react';
+import { Play, Save, Download, FolderOpen, History, Wand2 } from 'lucide-react';
 
 interface EditorToolbarProps {
   activeFileName?: string;
@@ -13,6 +13,7 @@ interface EditorToolbarProps {
   onDownloadFile?: () => void;
   onDownloadWorkspace?: () => void;
   onShowHistory?: () => void;
+  onGenerateFeature?: () => void;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -24,7 +25,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onSaveWorkspace,
   onDownloadFile,
   onDownloadWorkspace,
-  onShowHistory
+  onShowHistory,
+  onGenerateFeature
 }) => {
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
@@ -116,6 +118,18 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           >
             <History className="w-3.5 h-3.5" />
             <span>History</span>
+          </button>
+        )}
+
+        {/* Generate Feature Button */}
+        {onGenerateFeature && (
+          <button
+            onClick={onGenerateFeature}
+            className="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 transition-all duration-200 flex items-center space-x-1.5 shadow-sm"
+            title="Generate feature using AI"
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            <span>Generate</span>
           </button>
         )}
       </div>

@@ -51,3 +51,13 @@ export interface KarateResult {
   logs?: string[];
   rawOutput?: string;
 }
+
+export interface GenerateRequest {
+  name: string;
+  httpMethod?: string;
+  apiEndpoint?: string;
+  headers?: string;
+  requestBody?: string;
+  expectedResponse?: string;
+  verifications?: string;
+}
